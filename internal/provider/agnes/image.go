@@ -257,32 +257,37 @@ func (p *Provider) ImageVariation(ctx context.Context, req *model.ImageVariation
 	}), nil
 }
 
-// convertImageRequest converts OpenAI image request to Agnes format
-func (p *Provider) convertImageRequest(req *model.ImageGenerationRequest) *AgnesImageRequest {
-	agnesReq := &AgnesImageRequest{
-		Model:  p.resolveModel(req.Model),
-		Prompt: req.Prompt,
+// convertImageRequest converts OpenAI image request to Agnes format.
+// Uses map[string]interface{} so that response_format can be placed inside
+// extra_body (per Agnes spec: "不要将 response_format 放在请求体顶层，否则可能返回 400 错误").
+func (p *Provider) convertImageRequest(req *model.ImageGenerationRequest) map[string]interface{} {
+	agnesReq := map[string]interface{}{
+		"model":  p.resolveModel(req.Model),
+		"prompt": req.Prompt,
 	}
 
 	if req.N != nil {
-		agnesReq.N = *req.N
+		agnesReq["n"] = *req.N
 	} else {
-		agnesReq.N = 1 // default
+		agnesReq["n"] = 1 // default
 	}
 
 	// Convert size format
 	if req.Size != "" {
-		agnesReq.Size = convertSizeForAgnes(req.Size)
+		agnesReq["size"] = convertSizeForAgnes(req.Size)
 	}
 
-	// Handle response format
-	// OpenAI: url | b64_json
-	// Agnes: likely only supports url
+	// Handle response format per Agnes spec:
+	//   - response_format MUST go inside extra_body, NOT at top level
+	//   - For b64_json (text-to-image): use top-level "return_base64": true
+	//   - For url output: use extra_body.response_format = "url"
 	if req.ResponseFormat == "b64_json" {
-		p.logger.Warn("Agnes AI may not support b64_json response format, using url instead")
-		agnesReq.ResponseFormat = "url"
-	} else if req.ResponseFormat != "" {
-		agnesReq.ResponseFormat = req.ResponseFormat
+		agnesReq["return_base64"] = true
+	} else if req.ResponseFormat == "url" || req.ResponseFormat == "" {
+		// URL output or default: put response_format in extra_body
+		agnesReq["extra_body"] = map[string]interface{}{
+			"response_format": "url",
+		}
 	}
 
 	return agnesReq
