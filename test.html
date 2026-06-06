@@ -1,0 +1,2478 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>O4OpenAI API Gateway 测试面板</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1b26;
+    --surface2: #24253a;
+    --border: #2e2f45;
+    --text: #c0caf5;
+    --text-dim: #565f89;
+    --accent: #7aa2f7;
+    --accent2: #bb9af7;
+    --green: #9ece6a;
+    --red: #f7768e;
+    --orange: #e0af68;
+    --cyan: #7dcfff;
+    --pink: #ff007c;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'SF Mono', 'Menlo', 'Monaco', 'Consolas', monospace;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 13px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* Header */
+  .header {
+    background: linear-gradient(135deg, var(--surface) 0%, var(--surface2) 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 20px 32px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .header h1 {
+    font-size: 20px;
+    font-weight: 700;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .header .tag {
+    background: var(--accent);
+    color: var(--bg);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .header .health-badge {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    padding: 4px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    transition: all 0.2s;
+  }
+  .header .health-badge:hover { border-color: var(--accent); }
+  .health-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--text-dim);
+    transition: background 0.3s;
+  }
+  .health-dot.ok { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .health-dot.err { background: var(--red); box-shadow: 0 0 6px var(--red); }
+
+  /* Layout */
+  .main { display: flex; height: calc(100vh - 65px); }
+  .sidebar {
+    width: 240px;
+    min-width: 240px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 12px 0;
+  }
+  .sidebar .group-title {
+    padding: 8px 16px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-dim);
+    font-weight: 600;
+  }
+  .sidebar .item {
+    padding: 8px 16px 8px 24px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.15s;
+    border-left: 2px solid transparent;
+  }
+  .sidebar .item:hover { background: var(--surface2); }
+  .sidebar .item.active {
+    background: var(--surface2);
+    border-left-color: var(--accent);
+    color: var(--accent);
+  }
+  .sidebar .item .method {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 3px;
+    min-width: 32px;
+    text-align: center;
+  }
+  .method-get { background: #1a3a2a; color: var(--green); }
+  .method-post { background: #2a2a1a; color: var(--orange); }
+  .sidebar .item .path { color: var(--text-dim); }
+
+  /* Content area */
+  .content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .panel { flex: 1; overflow-y: auto; padding: 24px 32px; }
+
+  /* Settings bar */
+  .settings-bar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 32px;
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .settings-bar label {
+    font-size: 11px;
+    color: var(--text-dim);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .settings-bar input, .settings-bar select {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 12px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .settings-bar input:focus, .settings-bar select:focus {
+    border-color: var(--accent);
+  }
+  .settings-bar input { width: 320px; }
+  .settings-bar select { width: 160px; }
+
+  /* Form elements */
+  .form-group {
+    margin-bottom: 16px;
+  }
+  .form-group label {
+    display: block;
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+    font-weight: 600;
+  }
+  .form-group input, .form-group select, .form-group textarea {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+    border-color: var(--accent);
+  }
+  .form-group textarea {
+    min-height: 80px;
+    resize: vertical;
+    font-family: 'SF Mono', monospace;
+  }
+  .form-row {
+    display: flex;
+    gap: 12px;
+  }
+  .form-row .form-group { flex: 1; }
+
+  /* Buttons */
+  .btn {
+    padding: 8px 20px;
+    border: none;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: var(--bg);
+  }
+  .btn-primary:hover { opacity: 0.85; }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-secondary {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover { border-color: var(--accent); }
+
+  /* Response area */
+  .response-section {
+    margin-top: 20px;
+    border-top: 1px solid var(--border);
+    padding-top: 16px;
+  }
+  .response-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .status-badge {
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .status-2xx { background: #1a3a2a; color: var(--green); }
+  .status-4xx { background: #3a1a1a; color: var(--red); }
+  .status-5xx { background: #3a1a1a; color: var(--red); }
+  .time-badge { color: var(--text-dim); font-size: 12px; }
+  .response-body {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    font-size: 12px;
+    max-height: 500px;
+    overflow-y: auto;
+  }
+
+  /* Image result */
+  .image-result {
+    margin-top: 12px;
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .image-result img {
+    max-width: 300px;
+    max-height: 300px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+
+  /* Video result */
+  .video-result {
+    margin-top: 12px;
+  }
+  .video-result video {
+    max-width: 100%;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+
+  /* SSE log */
+  .sse-log {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    max-height: 300px;
+    overflow-y: auto;
+    font-size: 12px;
+    margin-top: 8px;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+  .sse-log .chunk { margin-bottom: 2px; }
+  .sse-log .chunk-delta { color: var(--cyan); }
+  .sse-log .chunk-done { color: var(--green); font-weight: 700; }
+
+  /* Stream text */
+  .stream-text {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    min-height: 80px;
+    margin-top: 8px;
+    white-space: pre-wrap;
+    font-size: 13px;
+    line-height: 1.7;
+  }
+
+  /* Polling status */
+  .poll-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  .spinner {
+    width: 14px; height: 14px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Hide sections */
+  .panel-section { display: none; }
+  .panel-section.active { display: block; }
+
+  /* Tab buttons in response area */
+  .resp-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 8px;
+  }
+  .resp-tab {
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+  }
+  .resp-tab.active {
+    background: var(--surface2);
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+
+  /* Markdown-like content */
+  .api-desc {
+    background: var(--surface2);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.8;
+  }
+  .api-desc code {
+    background: var(--bg);
+    padding: 1px 5px;
+    border-radius: 3px;
+    color: var(--cyan);
+    font-size: 11px;
+  }
+
+  /* ==================== Story Factory ==================== */
+  .wf-stepper {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-bottom: 24px;
+    position: relative;
+  }
+  .wf-step {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    z-index: 1;
+  }
+  .wf-step-circle {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: 700;
+    border: 2px solid var(--border);
+    background: var(--surface);
+    color: var(--text-dim);
+    transition: all 0.3s;
+    position: relative;
+    z-index: 2;
+  }
+  .wf-step.active .wf-step-circle {
+    border-color: var(--accent);
+    color: var(--accent);
+    box-shadow: 0 0 12px rgba(122,162,247,0.3);
+  }
+  .wf-step.done .wf-step-circle {
+    border-color: var(--green);
+    background: var(--green);
+    color: var(--bg);
+  }
+  .wf-step.running .wf-step-circle {
+    border-color: var(--orange);
+    animation: pulse-ring 1.5s ease infinite;
+  }
+  .wf-step.error .wf-step-circle {
+    border-color: var(--red);
+    color: var(--red);
+  }
+  @keyframes pulse-ring {
+    0% { box-shadow: 0 0 0 0 rgba(224,175,104,0.4); }
+    70% { box-shadow: 0 0 0 10px rgba(224,175,104,0); }
+    100% { box-shadow: 0 0 0 0 rgba(224,175,104,0); }
+  }
+  .wf-step-label {
+    margin-top: 6px;
+    font-size: 11px;
+    color: var(--text-dim);
+    font-weight: 600;
+    text-align: center;
+  }
+  .wf-step.active .wf-step-label,
+  .wf-step.running .wf-step-label { color: var(--text); }
+  .wf-step.done .wf-step-label { color: var(--green); }
+  .wf-step.error .wf-step-label { color: var(--red); }
+  .wf-step-line {
+    position: absolute;
+    top: 20px;
+    height: 2px;
+    background: var(--border);
+    z-index: 0;
+  }
+  .wf-step-line.done { background: var(--green); }
+
+  /* Scene cards */
+  .scenes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 16px;
+    margin-top: 16px;
+  }
+  .scene-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    transition: border-color 0.3s;
+  }
+  .scene-card:hover { border-color: var(--accent); }
+  .scene-card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .scene-card-header .scene-num {
+    background: var(--accent);
+    color: var(--bg);
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .scene-card-header .scene-title {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .scene-card-body {
+    padding: 12px 14px;
+  }
+  .scene-card-body .scene-desc {
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.6;
+    margin-bottom: 8px;
+  }
+  .scene-card-body .scene-prompt-tag {
+    font-size: 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 4px 8px;
+    color: var(--cyan);
+    margin-top: 4px;
+    display: block;
+    word-break: break-all;
+  }
+  .scene-card-body .scene-img-wrap {
+    margin-top: 8px;
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--bg);
+    position: relative;
+  }
+  .scene-card-body .scene-img-wrap img {
+    width: 100%;
+    display: block;
+    max-height: 220px;
+    object-fit: cover;
+  }
+  .scene-card-body .scene-img-placeholder {
+    width: 100%;
+    height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-dim);
+    font-size: 11px;
+  }
+  .scene-card-body .scene-video-wrap {
+    margin-top: 8px;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .scene-card-body .scene-video-wrap video {
+    width: 100%;
+    display: block;
+    border-radius: 6px;
+  }
+  .scene-card-body .scene-status {
+    margin-top: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+  .scene-card-body .scene-status .mini-spinner {
+    width: 12px; height: 12px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  .scene-badge {
+    padding: 2px 7px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 700;
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+  .scene-badge.pending { background: var(--surface2); color: var(--text-dim); }
+  .scene-badge.running { background: #2a2a1a; color: var(--orange); }
+  .scene-badge.done { background: #1a3a2a; color: var(--green); }
+  .scene-badge.error { background: #3a1a1a; color: var(--red); }
+
+  /* Script output box */
+  .script-box {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    margin-top: 12px;
+    white-space: pre-wrap;
+    font-size: 12px;
+    line-height: 1.8;
+    max-height: 400px;
+    overflow-y: auto;
+  }
+  .script-box .scene-divider {
+    color: var(--accent);
+    font-weight: 700;
+    margin-top: 8px;
+  }
+
+  /* Workflow log */
+  .wf-log {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    margin-top: 12px;
+    max-height: 200px;
+    overflow-y: auto;
+    font-size: 11px;
+    line-height: 1.8;
+  }
+  .wf-log .log-line { margin-bottom: 2px; }
+  .wf-log .log-ok { color: var(--green); }
+  .wf-log .log-err { color: var(--red); }
+  .wf-log .log-info { color: var(--cyan); }
+  .wf-log .log-warn { color: var(--orange); }
+  .wf-log .log-time { color: var(--text-dim); margin-right: 6px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>O4OpenAI</h1>
+  <span class="tag">API Gateway</span>
+  <span class="tag" style="background:var(--accent2)">Test Panel</span>
+  <div class="health-badge" onclick="checkHealth()">
+    <div class="health-dot" id="healthDot"></div>
+    <span id="healthText">未检测</span>
+  </div>
+</div>
+
+<div class="settings-bar">
+  <div style="display:flex;align-items:center;gap:8px;">
+    <label>Base URL</label>
+    <input type="text" id="baseUrl" value="http://localhost:1241" placeholder="http://localhost:1241">
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;">
+    <label>API Key</label>
+    <input type="password" id="apiKey" placeholder="Bearer Token / x-api-key">
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;">
+    <label>Provider</label>
+    <select id="providerPrefix">
+      <option value="">自动路由</option>
+      <option value="/agnes">agnes</option>
+    </select>
+  </div>
+</div>
+
+<div class="main">
+  <div class="sidebar">
+    <div class="group-title">系统</div>
+    <div class="item active" onclick="switchPanel('health', this)">
+      <span class="method method-get">GET</span>
+      <span class="path">/health</span>
+    </div>
+
+    <div class="group-title">Chat 对话</div>
+    <div class="item" onclick="switchPanel('chat', this)">
+      <span class="method method-post">POST</span>
+      <span class="path">/chat/completions</span>
+    </div>
+    <div class="item" onclick="switchPanel('chat-stream', this)">
+      <span class="method method-post">POST</span>
+      <span class="path">/chat/stream</span>
+    </div>
+
+    <div class="group-title">Anthropic Messages</div>
+    <div class="item" onclick="switchPanel('anthropic', this)">
+      <span class="method method-post">POST</span>
+      <span class="path">/messages</span>
+    </div>
+    <div class="item" onclick="switchPanel('anthropic-stream', this)">
+      <span class="method method-post">POST</span>
+      <span class="path">/messages/stream</span>
+    </div>
+
+    <div class="group-title">Images 图片</div>
+    <div class="item" onclick="switchPanel('image-gen', this)">
+      <span class="method method-post">POST</span>
+      <span class="path">/images/generations</span>
+    </div>
+    <div class="item" onclick="switchPanel('image-edit', this)">
+      <span class="method method-post">POST</span>
+      <span class="path">/images/edits</span>
+    </div>
+
+    <div class="group-title">Video 视频</div>
+    <div class="item" onclick="switchPanel('video-gen', this)">
+      <span class="method method-post">POST</span>
+      <span class="path">/videos/generations</span>
+    </div>
+    <div class="item" onclick="switchPanel('video-status', this)">
+      <span class="method method-get">GET</span>
+      <span class="path">/videos/:id</span>
+    </div>
+
+    <div class="group-title" style="color:var(--accent2)">🎬 故事工厂</div>
+    <div class="item" onclick="switchPanel('story-factory', this)">
+      <span class="method method-post" style="background:#2a1a3a;color:var(--accent2)">WF</span>
+      <span class="path">剧本→图片→视频</span>
+    </div>
+
+    <div class="group-title">Models 模型</div>
+    <div class="item" onclick="switchPanel('models', this)">
+      <span class="method method-get">GET</span>
+      <span class="path">/models</span>
+    </div>
+    <div class="item" onclick="switchPanel('model-detail', this)">
+      <span class="method method-get">GET</span>
+      <span class="path">/models/:model</span>
+    </div>
+  </div>
+
+  <div class="content">
+    <div class="panel">
+
+      <!-- ==================== Health ==================== -->
+      <div class="panel-section active" id="panel-health">
+        <div class="api-desc">
+          <strong>GET /health</strong> — 健康检查。Docker 健康检查使用此端点。无需认证。
+        </div>
+        <button class="btn btn-primary" onclick="checkHealth()">检测健康状态</button>
+        <div id="health-response"></div>
+      </div>
+
+      <!-- ==================== Chat Completions ==================== -->
+      <div class="panel-section" id="panel-chat">
+        <div class="api-desc">
+          <strong>POST /v1/chat/completions</strong> — OpenAI 兼容的 Chat 对话接口。支持多轮对话、function calling、thinking 模式等。<br>
+          模型列表: <code>agnes-1.5-flash</code> <code>agnes-2.0-flash</code>
+        </div>
+        <div class="form-group">
+          <label>Model</label>
+          <select id="chat-model">
+            <option value="agnes-2.0-flash">agnes-2.0-flash</option>
+            <option value="agnes-1.5-flash">agnes-1.5-flash</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Temperature (0~2)</label>
+            <input type="number" id="chat-temp" value="0.7" min="0" max="2" step="0.1">
+          </div>
+          <div class="form-group">
+            <label>Max Tokens</label>
+            <input type="number" id="chat-max-tokens" value="1024" min="1" max="65536">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>System Prompt (可选)</label>
+          <input type="text" id="chat-system" placeholder="你是一个有帮助的助手。">
+        </div>
+        <div class="form-group">
+          <label>User Message</label>
+          <textarea id="chat-message" rows="3">你好，请介绍一下你自己。</textarea>
+        </div>
+        <div class="form-group">
+          <label>Extra Body (JSON, 可选，如 chat_template_kwargs / thinking)</label>
+          <textarea id="chat-extra" rows="3" placeholder='{"chat_template_kwargs": {"enable_thinking": true}}'></textarea>
+        </div>
+        <button class="btn btn-primary" onclick="sendChat(false)">发送请求</button>
+        <div id="chat-response"></div>
+      </div>
+
+      <!-- ==================== Chat Stream ==================== -->
+      <div class="panel-section" id="panel-chat-stream">
+        <div class="api-desc">
+          <strong>POST /v1/chat/completions (stream: true)</strong> — 流式 Chat 对话。返回 SSE 事件流，实时输出文本。
+        </div>
+        <div class="form-group">
+          <label>Model</label>
+          <select id="chat-stream-model">
+            <option value="agnes-2.0-flash">agnes-2.0-flash</option>
+            <option value="agnes-1.5-flash">agnes-1.5-flash</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Temperature</label>
+            <input type="number" id="chat-stream-temp" value="0.7" min="0" max="2" step="0.1">
+          </div>
+          <div class="form-group">
+            <label>Max Tokens</label>
+            <input type="number" id="chat-stream-max-tokens" value="1024">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>System Prompt (可选)</label>
+          <input type="text" id="chat-stream-system" placeholder="你是一个有帮助的助手。">
+        </div>
+        <div class="form-group">
+          <label>User Message</label>
+          <textarea id="chat-stream-message" rows="3">请用中文写一首关于编程的短诗。</textarea>
+        </div>
+        <button class="btn btn-primary" id="streamBtn" onclick="sendChatStream()">开始流式输出</button>
+        <button class="btn btn-secondary" onclick="stopStream()" style="display:none" id="stopStreamBtn">停止</button>
+        <div class="stream-text" id="stream-output" style="display:none"></div>
+        <div id="chat-stream-response"></div>
+      </div>
+
+      <!-- ==================== Anthropic Messages ==================== -->
+      <div class="panel-section" id="panel-anthropic">
+        <div class="api-desc">
+          <strong>POST /v1/messages</strong> — Anthropic Messages API 兼容接口。网关会将 Anthropic 格式转换为 OpenAI 格式发送给 Provider。<br>
+          认证方式: <code>x-api-key</code> header 优先，或 <code>Authorization: Bearer</code>。
+        </div>
+        <div class="form-group">
+          <label>Model</label>
+          <select id="anthropic-model">
+            <option value="agnes-2.0-flash">agnes-2.0-flash</option>
+            <option value="agnes-1.5-flash">agnes-1.5-flash</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Max Tokens</label>
+            <input type="number" id="anthropic-max-tokens" value="1024">
+          </div>
+          <div class="form-group">
+            <label>Temperature</label>
+            <input type="number" id="anthropic-temp" value="0.7" min="0" max="2" step="0.1">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>System (可选)</label>
+          <input type="text" id="anthropic-system" placeholder="你是一个有帮助的助手。">
+        </div>
+        <div class="form-group">
+          <label>User Message</label>
+          <textarea id="anthropic-message" rows="3">Hello, what can you do?</textarea>
+        </div>
+        <button class="btn btn-primary" onclick="sendAnthropic(false)">发送请求</button>
+        <div id="anthropic-response"></div>
+      </div>
+
+      <!-- ==================== Anthropic Messages Stream ==================== -->
+      <div class="panel-section" id="panel-anthropic-stream">
+        <div class="api-desc">
+          <strong>POST /v1/messages (stream: true)</strong> — Anthropic 流式 Messages。返回 Anthropic 格式的 SSE 事件流（message_start, content_block_delta, message_stop 等）。
+        </div>
+        <div class="form-group">
+          <label>Model</label>
+          <select id="anthropic-stream-model">
+            <option value="agnes-2.0-flash">agnes-2.0-flash</option>
+            <option value="agnes-1.5-flash">agnes-1.5-flash</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Max Tokens</label>
+            <input type="number" id="anthropic-stream-max-tokens" value="1024">
+          </div>
+          <div class="form-group">
+            <label>Temperature</label>
+            <input type="number" id="anthropic-stream-temp" value="0.7" min="0" max="2" step="0.1">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>System (可选)</label>
+          <input type="text" id="anthropic-stream-system" placeholder="你是一个有帮助的助手。">
+        </div>
+        <div class="form-group">
+          <label>User Message</label>
+          <textarea id="anthropic-stream-message" rows="3">用中文简单介绍你自己</textarea>
+        </div>
+        <button class="btn btn-primary" id="anthropicStreamBtn" onclick="sendAnthropicStream()">开始流式输出</button>
+        <button class="btn btn-secondary" onclick="stopAnthropicStream()" style="display:none" id="stopAnthropicStreamBtn">停止</button>
+        <div class="stream-text" id="anthropic-stream-output" style="display:none"></div>
+        <div id="anthropic-stream-response"></div>
+      </div>
+
+      <!-- ==================== Image Generation ==================== -->
+      <div class="panel-section" id="panel-image-gen">
+        <div class="api-desc">
+          <strong>POST /v1/images/generations</strong> — 文生图接口。支持 <code>url</code> 和 <code>b64_json</code> 两种响应格式。<br>
+          模型: <code>agnes-image-2.0-flash</code> <code>agnes-image-2.1-flash</code>
+        </div>
+        <div class="form-group">
+          <label>Model</label>
+          <select id="img-model">
+            <option value="agnes-image-2.1-flash">agnes-image-2.1-flash</option>
+            <option value="agnes-image-2.0-flash">agnes-image-2.0-flash</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Prompt</label>
+          <textarea id="img-prompt" rows="3">一只可爱的猫咪坐在书堆上，水彩画风格，温暖的色调</textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Size</label>
+            <select id="img-size">
+              <option value="1024x1024">1024×1024</option>
+              <option value="1024x1536">1024×1536</option>
+              <option value="1536x1024">1536×1024</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Quality</label>
+            <select id="img-quality">
+              <option value="auto">auto</option>
+              <option value="standard">standard</option>
+              <option value="hd">hd</option>
+              <option value="low">low</option>
+              <option value="medium">medium</option>
+              <option value="high">high</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Response Format</label>
+            <select id="img-format">
+              <option value="url">url</option>
+              <option value="b64_json">b64_json</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>N (图片数量)</label>
+            <input type="number" id="img-n" value="1" min="1" max="4">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Style</label>
+          <select id="img-style">
+            <option value="">默认</option>
+            <option value="vivid">vivid</option>
+            <option value="natural">natural</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="generateImage()">生成图片</button>
+        <div id="img-response"></div>
+        <div class="image-result" id="img-result"></div>
+      </div>
+
+      <!-- ==================== Image Edit ==================== -->
+      <div class="panel-section" id="panel-image-edit">
+        <div class="api-desc">
+          <strong>POST /v1/images/edits</strong> — 图生图 / 图片编辑接口。需要提供原图和编辑提示词。<br>
+          图片可以是 URL、Data URI 或 base64 字符串。网关会将请求转换为 Provider 的 <code>/images/generations</code> 格式。
+        </div>
+        <div class="form-group">
+          <label>Model</label>
+          <select id="img-edit-model">
+            <option value="agnes-image-2.1-flash">agnes-image-2.1-flash</option>
+            <option value="agnes-image-2.0-flash">agnes-image-2.0-flash</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Image (URL / Base64 / 拖拽上传)</label>
+          <textarea id="img-edit-image" rows="3" placeholder="https://example.com/image.png 或粘贴 base64"></textarea>
+          <input type="file" id="img-edit-file" accept="image/*" style="margin-top:6px" onchange="handleImageFile(this, 'img-edit-image')">
+        </div>
+        <div class="form-group">
+          <label>Prompt (编辑指令)</label>
+          <textarea id="img-edit-prompt" rows="3">将背景变成星空</textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Size</label>
+            <select id="img-edit-size">
+              <option value="1024x1024">1024×1024</option>
+              <option value="1024x1536">1024×1536</option>
+              <option value="1536x1024">1536×1024</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Response Format</label>
+            <select id="img-edit-format">
+              <option value="url">url</option>
+              <option value="b64_json">b64_json</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="editImage()">编辑图片</button>
+        <div id="img-edit-response"></div>
+        <div class="image-result" id="img-edit-result"></div>
+      </div>
+
+      <!-- ==================== Video Generation ==================== -->
+      <div class="panel-section" id="panel-video-gen">
+        <div class="api-desc">
+          <strong>POST /v1/videos/generations</strong> — 异步视频生成接口。支持文生视频、图生视频。<br>
+          返回 <code>video_id</code>，需轮询 <code>GET /v1/videos/:id</code> 获取结果。<br>
+          模型: <code>agnes-video-v2.0</code>
+        </div>
+        <div class="form-group">
+          <label>Model</label>
+          <select id="video-model">
+            <option value="agnes-video-v2.0">agnes-video-v2.0</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Prompt (视频内容描述)</label>
+          <textarea id="video-prompt" rows="3">一只小猫在花园里追逐蝴蝶，阳光明媚，电影质感</textarea>
+        </div>
+        <div class="form-group">
+          <label>Input Image (可选，图生视频)</label>
+          <textarea id="video-image" rows="2" placeholder="图片 URL 或粘贴 base64（留空则为纯文生视频）"></textarea>
+          <input type="file" id="video-image-file" accept="image/*" style="margin-top:6px" onchange="handleImageFile(this, 'video-image')">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Size</label>
+            <select id="video-size">
+              <option value="">自动</option>
+              <option value="1152x768">1152×768 (默认)</option>
+              <option value="768x1152">768×1152</option>
+              <option value="1280x720">1280×720</option>
+              <option value="720x1280">720×1280</option>
+              <option value="1920x1080">1920×1080</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Duration (秒)</label>
+            <input type="number" id="video-duration" value="5" min="1" max="30">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Aspect Ratio (宽高比)</label>
+          <select id="video-aspect">
+            <option value="">默认</option>
+            <option value="16:9">16:9</option>
+            <option value="9:16">9:16</option>
+            <option value="1:1">1:1</option>
+            <option value="4:3">4:3</option>
+            <option value="3:4">3:4</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="generateVideo()">生成视频</button>
+        <div id="video-response"></div>
+        <div class="video-result" id="video-result"></div>
+      </div>
+
+      <!-- ==================== Video Status ==================== -->
+      <div class="panel-section" id="panel-video-status">
+        <div class="api-desc">
+          <strong>GET /v1/videos/:id</strong> — 查询视频生成状态。状态值: <code>queued</code> → <code>processing</code> → <code>completed</code> / <code>failed</code>。<br>
+          可点击"自动轮询"按钮，每 3 秒查询一次直到完成。
+        </div>
+        <div class="form-group">
+          <label>Video ID</label>
+          <input type="text" id="video-id" placeholder="video_xxx（从视频生成结果获取）">
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-primary" onclick="checkVideoStatus()">查询状态</button>
+          <button class="btn btn-secondary" id="pollBtn" onclick="togglePoll()">自动轮询</button>
+        </div>
+        <div class="poll-status" id="poll-status" style="display:none">
+          <div class="spinner"></div>
+          <span id="poll-text">轮询中...</span>
+        </div>
+        <div id="video-status-response"></div>
+        <div class="video-result" id="video-status-result"></div>
+      </div>
+
+      <!-- ==================== Story Factory ==================== -->
+      <div class="panel-section" id="panel-story-factory">
+        <div class="api-desc">
+          <strong>🎬 故事工厂</strong> — 全链路自动工作流：<code>Chat 生成剧本</code> → <code>Images 逐场景生图</code> → <code>Videos 逐场景生视频</code><br>
+          输入一个故事概念，自动完成分镜剧本、关键帧图片、场景视频的生成与拼装。每一步都可手动重新执行。
+        </div>
+
+        <!-- Stepper -->
+        <div class="wf-stepper" id="wf-stepper">
+          <div class="wf-step active" id="wf-step-1">
+            <div class="wf-step-circle">1</div>
+            <div class="wf-step-label">生成剧本</div>
+          </div>
+          <div class="wf-step" id="wf-step-2">
+            <div class="wf-step-circle">2</div>
+            <div class="wf-step-label">场景生图</div>
+          </div>
+          <div class="wf-step" id="wf-step-3">
+            <div class="wf-step-circle">3</div>
+            <div class="wf-step-label">场景生视频</div>
+          </div>
+        </div>
+
+        <!-- Config -->
+        <div class="form-group">
+          <label>故事概念</label>
+          <textarea id="wf-concept" rows="3" placeholder="例：一只叫小橘的流浪猫在城市中寻找家的温暖故事">一只叫小橘的流浪猫在城市中寻找家的温暖故事，最终被一个小女孩收养</textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>场景数量</label>
+            <select id="wf-scene-count">
+              <option value="3">3 个场景</option>
+              <option value="4" selected>4 个场景</option>
+              <option value="5">5 个场景</option>
+              <option value="6">6 个场景</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>生图模型</label>
+            <select id="wf-img-model">
+              <option value="agnes-image-2.1-flash">agnes-image-2.1-flash</option>
+              <option value="agnes-image-2.0-flash">agnes-image-2.0-flash</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>生视频模型</label>
+            <select id="wf-video-model">
+              <option value="agnes-video-v2.0">agnes-video-v2.0</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>视频时长 (秒)</label>
+            <input type="number" id="wf-video-duration" value="5" min="1" max="30">
+          </div>
+          <div class="form-group">
+            <label>视频尺寸</label>
+            <select id="wf-video-size">
+              <option value="">自动</option>
+              <option value="1152x768">1152×768</option>
+              <option value="1280x720">1280×720</option>
+              <option value="1920x1080">1920×1080</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:16px;">
+          <button class="btn btn-primary" id="wf-start-btn">🚀 一键生成全流程</button>
+          <button class="btn btn-secondary" id="wf-step1-btn">📝 仅生成剧本</button>
+          <button class="btn btn-secondary" id="wf-step2-btn">🖼️ 仅生图 (用当前剧本)</button>
+          <button class="btn btn-secondary" id="wf-step3-btn">🎬 仅生视频 (用当前图片)</button>
+          <button class="btn btn-secondary" id="wf-reset-btn">🔄 重置</button>
+        </div>
+
+        <!-- Script output -->
+        <div id="wf-script-section" style="display:none">
+          <div style="font-size:12px;color:var(--text-dim);font-weight:600;margin-bottom:4px;">📜 生成的剧本</div>
+          <div class="script-box" id="wf-script-box"></div>
+        </div>
+
+        <!-- Scenes grid -->
+        <div id="wf-scenes-section" style="display:none">
+          <div style="font-size:12px;color:var(--text-dim);font-weight:600;margin-bottom:4px;">🎬 场景板</div>
+          <div class="scenes-grid" id="wf-scenes-grid"></div>
+        </div>
+
+        <!-- Merge section -->
+        <div id="wf-merge-section" style="display:none;margin-top:20px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+            <div style="font-size:12px;color:var(--text-dim);font-weight:600;">🎬 视频合并</div>
+            <span class="scene-badge done">全部就绪</span>
+          </div>
+          <div style="display:flex;gap:8px;margin-bottom:12px;">
+            <button class="btn btn-primary" id="wf-merge-play-btn" onclick="wfPlayAll()">▶️ 连续播放全部</button>
+            <button class="btn btn-secondary" onclick="wfDownloadAll()">📦 逐个下载全部</button>
+          </div>
+          <div id="wf-merge-player" style="display:none;">
+            <video id="wf-merge-video" controls style="width:100%;max-width:800px;border-radius:8px;border:1px solid var(--border);" preload="auto"></video>
+          </div>
+        </div>
+
+        <!-- Workflow log -->
+        <div id="wf-log-section" style="display:none">
+          <div style="font-size:12px;color:var(--text-dim);font-weight:600;margin-bottom:4px;">📋 运行日志</div>
+          <div class="wf-log" id="wf-log"></div>
+        </div>
+      </div>
+
+      <!-- ==================== Models List ==================== -->
+      <div class="panel-section" id="panel-models">
+        <div class="api-desc">
+          <strong>GET /v1/models</strong> — 获取可用模型列表。无需认证。
+        </div>
+        <button class="btn btn-primary" onclick="listModels()">获取模型列表</button>
+        <div id="models-response"></div>
+      </div>
+
+      <!-- ==================== Model Detail ==================== -->
+      <div class="panel-section" id="panel-model-detail">
+        <div class="api-desc">
+          <strong>GET /v1/models/:model</strong> — 获取指定模型详情。无需认证。
+        </div>
+        <div class="form-group">
+          <label>Model Name</label>
+          <select id="model-detail-name">
+            <option value="agnes-2.0-flash">agnes-2.0-flash</option>
+            <option value="agnes-1.5-flash">agnes-1.5-flash</option>
+            <option value="agnes-image-2.1-flash">agnes-image-2.1-flash</option>
+            <option value="agnes-image-2.0-flash">agnes-image-2.0-flash</option>
+            <option value="agnes-video-v2.0">agnes-video-v2.0</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="getModelDetail()">获取模型详情</button>
+        <div id="model-detail-response"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+// ==================== Utilities ====================
+function getBaseUrl() {
+  return document.getElementById('baseUrl').value.replace(/\/+$/, '');
+}
+function getApiKey() {
+  return document.getElementById('apiKey').value.trim();
+}
+function getProviderPrefix() {
+  return document.getElementById('providerPrefix').value;
+}
+function url(path) {
+  return getBaseUrl() + getProviderPrefix() + path;
+}
+function headers(isJson = true) {
+  const h = {};
+  if (isJson) h['Content-Type'] = 'application/json';
+  const key = getApiKey();
+  if (key) h['Authorization'] = 'Bearer ' + key;
+  return h;
+}
+function anthropicHeaders() {
+  const h = { 'Content-Type': 'application/json', 'anthropic-version': '2023-06-01' };
+  const key = getApiKey();
+  if (key) {
+    h['x-api-key'] = key;
+    h['Authorization'] = 'Bearer ' + key;
+  }
+  return h;
+}
+function statusClass(code) {
+  if (code >= 200 && code < 300) return 'status-2xx';
+  if (code >= 400 && code < 500) return 'status-4xx';
+  return 'status-5xx';
+}
+function renderResponse(containerId, status, data, elapsed) {
+  const el = document.getElementById(containerId);
+  const cls = statusClass(status);
+  let formatted = '';
+  try {
+    formatted = JSON.stringify(typeof data === 'string' ? JSON.parse(data) : data, null, 2);
+  } catch {
+    formatted = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+  }
+  el.innerHTML = `
+    <div class="response-section">
+      <div class="response-header">
+        <span class="status-badge ${cls}">${status}</span>
+        <span class="time-badge">${elapsed}ms</span>
+      </div>
+      <div class="response-body">${escapeHtml(formatted)}</div>
+    </div>
+  `;
+}
+function escapeHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ==================== Panel switching ====================
+let currentPanel = 'health';
+function switchPanel(name, el) {
+  document.querySelectorAll('.panel-section').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.sidebar .item').forEach(i => i.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  if (el) el.classList.add('active');
+  currentPanel = name;
+}
+
+// ==================== Health ====================
+async function checkHealth() {
+  const dot = document.getElementById('healthDot');
+  const text = document.getElementById('healthText');
+  const t0 = performance.now();
+  try {
+    const res = await fetch(url('/health'));
+    const elapsed = Math.round(performance.now() - t0);
+    const data = await res.json();
+    if (res.ok) {
+      dot.className = 'health-dot ok';
+      text.textContent = '正常 (' + elapsed + 'ms)';
+    } else {
+      dot.className = 'health-dot err';
+      text.textContent = '异常 (' + res.status + ')';
+    }
+    renderResponse('health-response', res.status, data, elapsed);
+  } catch (e) {
+    const elapsed = Math.round(performance.now() - t0);
+    dot.className = 'health-dot err';
+    text.textContent = '连接失败';
+    document.getElementById('health-response').innerHTML = `
+      <div class="response-section">
+        <div class="response-header">
+          <span class="status-badge status-5xx">ERR</span>
+          <span class="time-badge">${elapsed}ms</span>
+        </div>
+        <div class="response-body" style="color:var(--red)">${escapeHtml(e.message)}</div>
+      </div>
+    `;
+  }
+}
+
+// ==================== Chat (non-stream) ====================
+async function sendChat(isRetry) {
+  const model = document.getElementById('chat-model').value;
+  const temp = parseFloat(document.getElementById('chat-temp').value) || 0.7;
+  const maxTokens = parseInt(document.getElementById('chat-max-tokens').value) || 1024;
+  const system = document.getElementById('chat-system').value.trim();
+  const userMsg = document.getElementById('chat-message').value.trim();
+  let extraBody = {};
+  const extraStr = document.getElementById('chat-extra').value.trim();
+  if (extraStr) {
+    try { extraBody = JSON.parse(extraStr); } catch { extraBody = {}; }
+  }
+  const messages = [];
+  if (system) messages.push({ role: 'system', content: system });
+  messages.push({ role: 'user', content: userMsg });
+
+  const body = { model, messages, temperature: temp, max_tokens: maxTokens, stream: false, ...extraBody };
+  const t0 = performance.now();
+  try {
+    const res = await fetch(url('/v1/chat/completions'), {
+      method: 'POST', headers: headers(), body: JSON.stringify(body)
+    });
+    const elapsed = Math.round(performance.now() - t0);
+    const data = await res.json();
+    renderResponse('chat-response', res.status, data, elapsed);
+  } catch (e) {
+    const elapsed = Math.round(performance.now() - t0);
+    renderResponse('chat-response', 0, { error: e.message }, elapsed);
+  }
+}
+
+// ==================== Chat (stream) ====================
+let streamController = null;
+async function sendChatStream() {
+  const model = document.getElementById('chat-stream-model').value;
+  const temp = parseFloat(document.getElementById('chat-stream-temp').value) || 0.7;
+  const maxTokens = parseInt(document.getElementById('chat-stream-max-tokens').value) || 1024;
+  const system = document.getElementById('chat-stream-system').value.trim();
+  const userMsg = document.getElementById('chat-stream-message').value.trim();
+  const messages = [];
+  if (system) messages.push({ role: 'system', content: system });
+  messages.push({ role: 'user', content: userMsg });
+
+  const body = { model, messages, temperature: temp, max_tokens: maxTokens, stream: true };
+
+  streamController = new AbortController();
+  document.getElementById('streamBtn').disabled = true;
+  document.getElementById('stopStreamBtn').style.display = 'inline-flex';
+  const outputEl = document.getElementById('stream-output');
+  outputEl.style.display = 'block';
+  outputEl.textContent = '';
+  const respEl = document.getElementById('chat-stream-response');
+  respEl.innerHTML = '';
+  const t0 = performance.now();
+  let fullText = '';
+  try {
+    const res = await fetch(url('/v1/chat/completions'), {
+      method: 'POST', headers: headers(), body: JSON.stringify(body),
+      signal: streamController.signal
+    });
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const payload = line.slice(6).trim();
+        if (payload === '[DONE]') continue;
+        try {
+          const chunk = JSON.parse(payload);
+          const delta = chunk.choices?.[0]?.delta?.content;
+          if (delta) {
+            fullText += delta;
+            outputEl.textContent = fullText;
+            outputEl.scrollTop = outputEl.scrollHeight;
+          }
+        } catch {}
+      }
+    }
+    const elapsed = Math.round(performance.now() - t0);
+    respEl.innerHTML = `
+      <div class="response-section">
+        <div class="response-header">
+          <span class="status-badge status-2xx">Stream Done</span>
+          <span class="time-badge">${elapsed}ms | ${(fullText.length / (elapsed / 1000)).toFixed(0)} chars/s</span>
+        </div>
+      </div>
+    `;
+  } catch (e) {
+    if (e.name !== 'AbortError') {
+      const elapsed = Math.round(performance.now() - t0);
+      renderResponse('chat-stream-response', 0, { error: e.message }, elapsed);
+    }
+  } finally {
+    document.getElementById('streamBtn').disabled = false;
+    document.getElementById('stopStreamBtn').style.display = 'none';
+    streamController = null;
+  }
+}
+function stopStream() {
+  if (streamController) streamController.abort();
+}
+
+// ==================== Anthropic (non-stream) ====================
+async function sendAnthropic() {
+  const model = document.getElementById('anthropic-model').value;
+  const maxTokens = parseInt(document.getElementById('anthropic-max-tokens').value) || 1024;
+  const temp = parseFloat(document.getElementById('anthropic-temp').value) || undefined;
+  const system = document.getElementById('anthropic-system').value.trim();
+  const userMsg = document.getElementById('anthropic-message').value.trim();
+
+  const body = {
+    model,
+    max_tokens: maxTokens,
+    messages: [{ role: 'user', content: userMsg }],
+    stream: false
+  };
+  if (system) body.system = system;
+  if (temp !== undefined) body.temperature = temp;
+
+  const t0 = performance.now();
+  try {
+    const res = await fetch(url('/v1/messages'), {
+      method: 'POST', headers: anthropicHeaders(), body: JSON.stringify(body)
+    });
+    const elapsed = Math.round(performance.now() - t0);
+    const data = await res.json();
+    renderResponse('anthropic-response', res.status, data, elapsed);
+  } catch (e) {
+    const elapsed = Math.round(performance.now() - t0);
+    renderResponse('anthropic-response', 0, { error: e.message }, elapsed);
+  }
+}
+
+// ==================== Anthropic (stream) ====================
+let anthropicStreamController = null;
+async function sendAnthropicStream() {
+  const model = document.getElementById('anthropic-stream-model').value;
+  const maxTokens = parseInt(document.getElementById('anthropic-stream-max-tokens').value) || 1024;
+  const temp = parseFloat(document.getElementById('anthropic-stream-temp').value) || undefined;
+  const system = document.getElementById('anthropic-stream-system').value.trim();
+  const userMsg = document.getElementById('anthropic-stream-message').value.trim();
+
+  const body = {
+    model, max_tokens: maxTokens,
+    messages: [{ role: 'user', content: userMsg }],
+    stream: true
+  };
+  if (system) body.system = system;
+  if (temp !== undefined) body.temperature = temp;
+
+  anthropicStreamController = new AbortController();
+  document.getElementById('anthropicStreamBtn').disabled = true;
+  document.getElementById('stopAnthropicStreamBtn').style.display = 'inline-flex';
+  const outputEl = document.getElementById('anthropic-stream-output');
+  outputEl.style.display = 'block';
+  outputEl.textContent = '';
+  const respEl = document.getElementById('anthropic-stream-response');
+  respEl.innerHTML = '';
+  const t0 = performance.now();
+  let fullText = '';
+
+  try {
+    const res = await fetch(url('/v1/messages'), {
+      method: 'POST', headers: anthropicHeaders(), body: JSON.stringify(body),
+      signal: anthropicStreamController.signal
+    });
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+      for (const line of lines) {
+        if (!line.startsWith('event: ') && !line.startsWith('data: ')) continue;
+        if (line.startsWith('data: ')) {
+          const payload = line.slice(6).trim();
+          try {
+            const evt = JSON.parse(payload);
+            if (evt.type === 'content_block_delta') {
+              const delta = evt.delta?.text || '';
+              if (delta) {
+                fullText += delta;
+                outputEl.textContent = fullText;
+                outputEl.scrollTop = outputEl.scrollHeight;
+              }
+            }
+          } catch {}
+        }
+      }
+    }
+    const elapsed = Math.round(performance.now() - t0);
+    respEl.innerHTML = `
+      <div class="response-section">
+        <div class="response-header">
+          <span class="status-badge status-2xx">Stream Done</span>
+          <span class="time-badge">${elapsed}ms | ${(fullText.length / (elapsed / 1000)).toFixed(0)} chars/s</span>
+        </div>
+      </div>
+    `;
+  } catch (e) {
+    if (e.name !== 'AbortError') {
+      const elapsed = Math.round(performance.now() - t0);
+      renderResponse('anthropic-stream-response', 0, { error: e.message }, elapsed);
+    }
+  } finally {
+    document.getElementById('anthropicStreamBtn').disabled = false;
+    document.getElementById('stopAnthropicStreamBtn').style.display = 'none';
+    anthropicStreamController = null;
+  }
+}
+function stopAnthropicStream() {
+  if (anthropicStreamController) anthropicStreamController.abort();
+}
+
+// ==================== Image Generation ====================
+async function generateImage() {
+  const model = document.getElementById('img-model').value;
+  const prompt = document.getElementById('img-prompt').value.trim();
+  const size = document.getElementById('img-size').value;
+  const quality = document.getElementById('img-quality').value;
+  const responseFormat = document.getElementById('img-format').value;
+  const n = parseInt(document.getElementById('img-n').value) || 1;
+  const style = document.getElementById('img-style').value;
+
+  const body = { model, prompt, size, quality, response_format: responseFormat, n };
+  if (style) body.style = style;
+
+  document.getElementById('img-result').innerHTML = '';
+  const t0 = performance.now();
+  try {
+    const res = await fetch(url('/v1/images/generations'), {
+      method: 'POST', headers: headers(), body: JSON.stringify(body)
+    });
+    const elapsed = Math.round(performance.now() - t0);
+    const data = await res.json();
+    renderResponse('img-response', res.status, data, elapsed);
+    if (res.ok && data.data) {
+      const container = document.getElementById('img-result');
+      data.data.forEach(img => {
+        if (img.url) {
+          container.innerHTML += `<img src="${escapeHtml(img.url)}" alt="generated">`;
+        } else if (img.b64_json) {
+          container.innerHTML += `<img src="data:image/png;base64,${img.b64_json}" alt="generated">`;
+        }
+      });
+    }
+  } catch (e) {
+    const elapsed = Math.round(performance.now() - t0);
+    renderResponse('img-response', 0, { error: e.message }, elapsed);
+  }
+}
+
+// ==================== Image Edit ====================
+function handleImageFile(input, targetId) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    document.getElementById(targetId).value = reader.result; // data URI
+  };
+  reader.readAsDataURL(file);
+}
+async function editImage() {
+  const model = document.getElementById('img-edit-model').value;
+  const image = document.getElementById('img-edit-image').value.trim();
+  const prompt = document.getElementById('img-edit-prompt').value.trim();
+  const size = document.getElementById('img-edit-size').value;
+  const responseFormat = document.getElementById('img-edit-format').value;
+
+  if (!image) { alert('请提供原图（URL 或 Base64）'); return; }
+  if (!prompt) { alert('请输入编辑提示词'); return; }
+
+  const body = { model, image, prompt, size, response_format: responseFormat };
+
+  document.getElementById('img-edit-result').innerHTML = '';
+  const t0 = performance.now();
+  try {
+    const res = await fetch(url('/v1/images/edits'), {
+      method: 'POST', headers: headers(), body: JSON.stringify(body)
+    });
+    const elapsed = Math.round(performance.now() - t0);
+    const data = await res.json();
+    renderResponse('img-edit-response', res.status, data, elapsed);
+    if (res.ok && data.data) {
+      const container = document.getElementById('img-edit-result');
+      data.data.forEach(img => {
+        if (img.url) {
+          container.innerHTML += `<img src="${escapeHtml(img.url)}" alt="edited">`;
+        } else if (img.b64_json) {
+          container.innerHTML += `<img src="data:image/png;base64,${img.b64_json}" alt="edited">`;
+        }
+      });
+    }
+  } catch (e) {
+    const elapsed = Math.round(performance.now() - t0);
+    renderResponse('img-edit-response', 0, { error: e.message }, elapsed);
+  }
+}
+
+// ==================== Video Generation ====================
+async function generateVideo() {
+  const model = document.getElementById('video-model').value;
+  const prompt = document.getElementById('video-prompt').value.trim();
+  const imageUrl = document.getElementById('video-image').value.trim();
+  const size = document.getElementById('video-size').value;
+  const duration = document.getElementById('video-duration').value;
+  const aspectRatio = document.getElementById('video-aspect').value;
+
+  const body = { model, input: [{ type: 'text', text: prompt }] };
+  if (size) body.size = size;
+  if (duration) body.duration = duration;
+  if (aspectRatio) body.aspect_ratio = aspectRatio;
+  if (imageUrl) {
+    body.input.push({ type: 'image', image: imageUrl });
+  }
+
+  document.getElementById('video-result').innerHTML = '';
+  const t0 = performance.now();
+  try {
+    const res = await fetch(url('/v1/videos/generations'), {
+      method: 'POST', headers: headers(), body: JSON.stringify(body)
+    });
+    const elapsed = Math.round(performance.now() - t0);
+    const data = await res.json();
+    renderResponse('video-response', res.status, data, elapsed);
+    // Auto-fill video ID for status check
+    if (data.id) {
+      document.getElementById('video-id').value = data.id;
+    }
+  } catch (e) {
+    const elapsed = Math.round(performance.now() - t0);
+    renderResponse('video-response', 0, { error: e.message }, elapsed);
+  }
+}
+
+// ==================== Video Status ====================
+let pollTimer = null;
+let isPolling = false;
+async function checkVideoStatus() {
+  const videoId = document.getElementById('video-id').value.trim();
+  if (!videoId) { alert('请输入 Video ID'); return; }
+
+  const t0 = performance.now();
+  try {
+    const res = await fetch(url('/v1/videos/' + encodeURIComponent(videoId)), {
+      method: 'GET', headers: headers()
+    });
+    const elapsed = Math.round(performance.now() - t0);
+    const data = await res.json();
+    renderResponse('video-status-response', res.status, data, elapsed);
+    renderVideoResult(data);
+    return data;
+  } catch (e) {
+    const elapsed = Math.round(performance.now() - t0);
+    renderResponse('video-status-response', 0, { error: e.message }, elapsed);
+    return null;
+  }
+}
+function renderVideoResult(data) {
+  const container = document.getElementById('video-status-result');
+  container.innerHTML = '';
+  if (data.status === 'completed' && data.output) {
+    data.output.forEach(out => {
+      if (out.type === 'url' && out.url) {
+        container.innerHTML += `
+          <video controls autoplay loop style="max-width:100%;border-radius:8px;border:1px solid var(--border);margin-top:8px;">
+            <source src="${escapeHtml(out.url)}" type="${out.mime_type || 'video/mp4'}">
+          </video>
+          <div style="margin-top:4px;font-size:11px;color:var(--text-dim);">
+            <a href="${escapeHtml(out.url)}" target="_blank" style="color:var(--accent);">下载视频</a>
+            ${out.duration ? ' | 时长: ' + out.duration + 's' : ''}
+          </div>
+        `;
+      }
+    });
+  }
+}
+async function togglePoll() {
+  const btn = document.getElementById('pollBtn');
+  const statusEl = document.getElementById('poll-status');
+  if (isPolling) {
+    clearInterval(pollTimer);
+    isPolling = false;
+    btn.textContent = '自动轮询';
+    statusEl.style.display = 'none';
+    return;
+  }
+  const videoId = document.getElementById('video-id').value.trim();
+  if (!videoId) { alert('请先输入 Video ID'); return; }
+  isPolling = true;
+  btn.textContent = '停止轮询';
+  statusEl.style.display = 'flex';
+  const poll = async () => {
+    const data = await checkVideoStatus();
+    if (data && (data.status === 'completed' || data.status === 'failed')) {
+      clearInterval(pollTimer);
+      isPolling = false;
+      btn.textContent = '自动轮询';
+      document.getElementById('poll-status').style.display = 'none';
+      document.getElementById('poll-text').textContent = data.status === 'completed' ? '已完成!' : '失败!';
+    } else {
+      document.getElementById('poll-text').textContent = '轮询中... 状态: ' + (data?.status || '未知');
+    }
+  };
+  await poll();
+  pollTimer = setInterval(poll, 3000);
+}
+
+// ==================== Models ====================
+async function listModels() {
+  const t0 = performance.now();
+  try {
+    const res = await fetch(url('/v1/models'), { method: 'GET' });
+    const elapsed = Math.round(performance.now() - t0);
+    const data = await res.json();
+    renderResponse('models-response', res.status, data, elapsed);
+  } catch (e) {
+    const elapsed = Math.round(performance.now() - t0);
+    renderResponse('models-response', 0, { error: e.message }, elapsed);
+  }
+}
+async function getModelDetail() {
+  const model = document.getElementById('model-detail-name').value;
+  const t0 = performance.now();
+  try {
+    const res = await fetch(url('/v1/models/' + encodeURIComponent(model)), { method: 'GET' });
+    const elapsed = Math.round(performance.now() - t0);
+    const data = await res.json();
+    renderResponse('model-detail-response', res.status, data, elapsed);
+  } catch (e) {
+    const elapsed = Math.round(performance.now() - t0);
+    renderResponse('model-detail-response', 0, { error: e.message }, elapsed);
+  }
+}
+
+// ==================== Story Factory ====================
+let wfScenes = []; // {title, desc, image_prompt, video_prompt, imageUrl, videoId, videoUrl, videoStatus}
+let wfRunning = false;
+
+// Safe helper: get element or log warning
+function wfGet(id) {
+  const el = document.getElementById(id);
+  if (!el) console.warn('[StoryFactory] Element not found:', id);
+  return el;
+}
+
+function wfLog(msg, type = '') {
+  const logEl = wfGet('wf-log');
+  const sectionEl = wfGet('wf-log-section');
+  if (!logEl || !sectionEl) { console.log('[StoryFactory]', msg); return; }
+  sectionEl.style.display = 'block';
+  const t = new Date().toLocaleTimeString();
+  logEl.innerHTML += '<div class="log-line ' + (type ? 'log-' + type : '') + '"><span class="log-time">[' + t + ']</span>' + escapeHtml(msg) + '</div>';
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+function wfSetStep(stepNum, state) {
+  for (let i = 1; i <= 3; i++) {
+    const el = wfGet('wf-step-' + i);
+    if (!el) continue;
+    el.className = 'wf-step';
+    if (i < stepNum) el.classList.add('done');
+    if (i === stepNum) el.classList.add(state);
+  }
+}
+
+function wfRenderScenes() {
+  if (wfScenes.length === 0) return;
+  var section = wfGet('wf-scenes-section');
+  if (section) section.style.display = 'block';
+  var grid = wfGet('wf-scenes-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  wfScenes.forEach(function(s, i) {
+    var imgHtml = '';
+    var retryImgBtn = '<button class="btn btn-secondary" data-retry-img="' + i + '" style="margin-top:6px;font-size:11px;padding:4px 10px;">🔄 重新生图</button>';
+    if (s.imageUrl) {
+      imgHtml = '<div class="scene-img-wrap"><img src="' + escapeHtml(s.imageUrl) + '" alt="scene ' + (i + 1) + '"></div>';
+      imgHtml += retryImgBtn;
+    } else if (s.imgStatus === 'error') {
+      imgHtml = '<div class="scene-img-placeholder" style="color:var(--red)">❌ 生图失败</div>';
+      imgHtml += retryImgBtn;
+    } else if (s.imgStatus === 'running') {
+      imgHtml = '<div class="scene-img-placeholder"><div class="mini-spinner"></div> 生图中...</div>';
+    } else {
+      imgHtml = '<div class="scene-img-placeholder">等待生图</div>';
+    }
+    var videoHtml = '';
+    var retryVideoBtn = '<button class="btn btn-secondary" data-retry-video="' + i + '" style="margin-top:6px;font-size:11px;padding:4px 10px;">🔄 重新生视频</button>';
+    if (s.videoUrl) {
+      videoHtml = '<div class="scene-video-wrap"><video controls loop preload="auto"><source src="' + escapeHtml(s.videoUrl) + '" type="video/mp4"></video></div>';
+      videoHtml += '<div style="display:flex;gap:6px;margin-top:6px;">' + retryVideoBtn;
+      videoHtml += '<a href="' + escapeHtml(s.videoUrl) + '" download="scene_' + (i + 1) + '.mp4" class="btn btn-secondary" style="font-size:11px;padding:4px 10px;text-decoration:none;">📥 下载</a></div>';
+    }
+    var statusHtml = '';
+    if (s.videoStatus === 'running') {
+      statusHtml = '<div class="scene-status"><div class="mini-spinner"></div><span>视频生成中 (ID: ' + escapeHtml(s.videoId || '') + ')</span></div>';
+    } else if (s.videoStatus === 'failed') {
+      statusHtml = '<div class="scene-status" style="color:var(--red)">❌ 视频生成失败 ' + retryVideoBtn + '</div>';
+    } else if (s.videoStatus === 'completed' && !s.videoUrl) {
+      statusHtml = '<div class="scene-status" style="color:var(--green)">✅ 视频已就绪</div>';
+    }
+    var badgeClass = 'pending', badgeText = '待处理';
+    if (s.videoUrl) { badgeClass = 'done'; badgeText = '✅ 完成'; }
+    else if (s.videoStatus === 'failed') { badgeClass = 'error'; badgeText = '视频失败'; }
+    else if (s.videoStatus === 'running') { badgeClass = 'running'; badgeText = '生成中'; }
+    else if (s.imgStatus === 'error') { badgeClass = 'error'; badgeText = '图片失败'; }
+    else if (s.imageUrl && !s.videoId) { badgeClass = 'pending'; badgeText = '待生视频'; }
+    else if (s.imageUrl && s.videoId) { badgeClass = 'running'; badgeText = '视频中'; }
+    else if (s.imgStatus === 'running') { badgeClass = 'running'; badgeText = '生图中'; }
+    else if (s.imageUrl) { badgeClass = 'done'; badgeText = '图 ✓'; }
+
+    grid.innerHTML += '<div class="scene-card">' +
+      '<div class="scene-card-header">' +
+        '<span class="scene-num">' + (i + 1) + '</span>' +
+        '<span class="scene-title">' + escapeHtml(s.title) + '</span>' +
+        '<span class="scene-badge ' + badgeClass + '">' + badgeText + '</span>' +
+      '</div>' +
+      '<div class="scene-card-body">' +
+        '<div class="scene-desc">' + escapeHtml(s.desc) + '</div>' +
+        '<span class="scene-prompt-tag">🖼️ ' + escapeHtml(s.image_prompt) + '</span>' +
+        imgHtml + videoHtml + statusHtml +
+      '</div>' +
+    '</div>';
+  });
+  // Show merge section when all videos are done
+  var mergeSection = wfGet('wf-merge-section');
+  if (mergeSection) {
+    var allHaveVideo = wfScenes.length > 0 && wfScenes.every(function(s) { return !!s.videoUrl; });
+    mergeSection.style.display = allHaveVideo ? 'block' : 'none';
+  }
+}
+
+// Retry single scene — image
+function wfRetryImage(sceneIndex) {
+  if (sceneIndex < 0 || sceneIndex >= wfScenes.length) return;
+  var s = wfScenes[sceneIndex];
+  var modelEl = wfGet('wf-img-model');
+  var model = modelEl ? modelEl.value : 'agnes-image-2.1-flash';
+  s.imgStatus = 'running';
+  s.imageUrl = null;
+  wfRenderScenes();
+  lsSaveScenes();
+  wfLog('重试生图 [' + (sceneIndex + 1) + '] ' + s.title + '...');
+
+  var body = { model: model, prompt: s.image_prompt, size: '1024x1024', n: 1 };
+  fetch(url('/v1/images/generations'), {
+    method: 'POST', headers: headers(), body: JSON.stringify(body)
+  }).then(function(res) { return res.json(); }).then(function(data) {
+    if (data.data && data.data[0] && data.data[0].url) {
+      s.imageUrl = data.data[0].url;
+      s.imgStatus = 'done';
+      wfLog('  [' + (sceneIndex + 1) + '] ✓ 生图重试成功', 'ok');
+    } else if (data.data && data.data[0] && data.data[0].b64_json) {
+      s.imageUrl = 'data:image/png;base64,' + data.data[0].b64_json;
+      s.imgStatus = 'done';
+      wfLog('  [' + (sceneIndex + 1) + '] ✓ 生图重试成功 (b64)', 'ok');
+    } else {
+      s.imgStatus = 'error';
+      wfLog('  [' + (sceneIndex + 1) + '] ✗ 重试失败: ' + JSON.stringify(data.error || data), 'err');
+    }
+    wfRenderScenes();
+    lsSaveScenes();
+  }).catch(function(e) {
+    s.imgStatus = 'error';
+    wfLog('  [' + (sceneIndex + 1) + '] ✗ 网络错误: ' + e.message, 'err');
+    wfRenderScenes();
+    lsSaveScenes();
+  });
+}
+
+// Retry single scene — video
+function wfRetryVideo(sceneIndex) {
+  if (sceneIndex < 0 || sceneIndex >= wfScenes.length) return;
+  var s = wfScenes[sceneIndex];
+  if (!s.imageUrl) { alert('该场景还没有图片，请先生图'); return; }
+  var modelEl = wfGet('wf-video-model');
+  var model = modelEl ? modelEl.value : 'agnes-video-v2.0';
+  var durEl = wfGet('wf-video-duration');
+  var duration = durEl ? durEl.value : '5';
+  var sizeEl = wfGet('wf-video-size');
+  var vSize = sizeEl ? sizeEl.value : '';
+  s.videoStatus = 'running';
+  s.videoId = null;
+  s.videoUrl = null;
+  wfRenderScenes();
+  lsSaveScenes();
+  wfLog('重试生视频 [' + (sceneIndex + 1) + '] ' + s.title + '...');
+
+  var body = {
+    model: model,
+    input: [
+      { type: 'text', text: s.video_prompt },
+      { type: 'image', image: s.imageUrl }
+    ],
+    duration: duration || '5'
+  };
+  if (vSize) body.size = vSize;
+
+  fetch(url('/v1/videos/generations'), {
+    method: 'POST', headers: headers(), body: JSON.stringify(body)
+  }).then(function(res) { return res.json(); }).then(function(data) {
+    if (data.id) {
+      s.videoId = data.id;
+      wfLog('  [' + (sceneIndex + 1) + '] 已提交 (ID: ' + data.id + ')', 'ok');
+      wfRenderScenes();
+      lsSaveScenes();
+      // Start polling for this single video
+      pollSingleVideo(sceneIndex);
+    } else {
+      s.videoStatus = 'failed';
+      wfLog('  [' + (sceneIndex + 1) + '] ✗ 提交失败: ' + JSON.stringify(data.error || data), 'err');
+      wfRenderScenes();
+      lsSaveScenes();
+    }
+  }).catch(function(e) {
+    s.videoStatus = 'failed';
+    wfLog('  [' + (sceneIndex + 1) + '] ✗ 网络错误: ' + e.message, 'err');
+    wfRenderScenes();
+    lsSaveScenes();
+  });
+}
+
+// Poll a single video until done
+function pollSingleVideo(sceneIndex) {
+  var s = wfScenes[sceneIndex];
+  if (!s.videoId) return;
+  var timer = setInterval(function() {
+    fetch(url('/v1/videos/' + encodeURIComponent(s.videoId)), {
+      method: 'GET', headers: headers()
+    }).then(function(res) { return res.json(); }).then(function(data) {
+      if (data.status === 'completed' && data.output && data.output[0] && data.output[0].url) {
+        s.videoUrl = data.output[0].url;
+        s.videoStatus = 'completed';
+        wfLog('  [' + (sceneIndex + 1) + '] ✓ 视频已完成!', 'ok');
+        clearInterval(timer);
+        wfRenderScenes();
+        lsSaveScenes();
+      } else if (data.status === 'failed') {
+        s.videoStatus = 'failed';
+        wfLog('  [' + (sceneIndex + 1) + '] ✗ 视频生成失败', 'err');
+        clearInterval(timer);
+        wfRenderScenes();
+        lsSaveScenes();
+      }
+    }).catch(function() {});
+  }, 5000);
+}
+
+// Event delegation for retry buttons on the scenes grid
+(function() {
+  var grid = document.getElementById('wf-scenes-grid');
+  if (grid) grid.addEventListener('click', function(e) {
+    var btn = e.target.closest('[data-retry-img]');
+    if (btn) { wfRetryImage(parseInt(btn.getAttribute('data-retry-img'))); return; }
+    btn = e.target.closest('[data-retry-video]');
+    if (btn) { wfRetryVideo(parseInt(btn.getAttribute('data-retry-video'))); return; }
+  });
+})();
+
+// ==================== Video Merge & Playback ====================
+
+// Get all video URLs in order
+function wfGetVideoUrls() {
+  return wfScenes.filter(function(s) { return !!s.videoUrl; }).map(function(s) { return s.videoUrl; });
+}
+
+// Sequential playback in the merge player
+function wfPlayAll() {
+  var urls = wfGetVideoUrls();
+  if (urls.length === 0) { alert('没有可播放的视频'); return; }
+  var playerDiv = wfGet('wf-merge-player');
+  var video = wfGet('wf-merge-video');
+  if (!playerDiv || !video) return;
+  playerDiv.style.display = 'block';
+  wfLog('连续播放 ' + urls.length + ' 个场景视频...', 'info');
+
+  var idx = 0;
+  video.src = urls[0];
+  video.play();
+  video.onended = function() {
+    idx++;
+    if (idx < urls.length) {
+      video.src = urls[idx];
+      video.play();
+    } else {
+      wfLog('播放完毕', 'ok');
+    }
+  };
+}
+
+// Download each video individually
+function wfDownloadAll() {
+  var urls = wfGetVideoUrls();
+  if (urls.length === 0) { alert('没有可下载的视频'); return; }
+  wfLog('打开 ' + urls.length + ' 个视频下载链接...', 'info');
+  urls.forEach(function(u, i) {
+    var title = wfScenes[i] ? wfScenes[i].title : ('scene_' + (i + 1));
+    wfLog('  场景 ' + (i + 1) + ': ' + title);
+    window.open(u, '_blank');
+  });
+}
+
+async function wfStep1() {
+  var conceptEl = wfGet('wf-concept');
+  var countEl = wfGet('wf-scene-count');
+  if (!conceptEl || !countEl) { alert('页面元素未找到，请刷新页面'); return; }
+  var concept = conceptEl.value.trim();
+  var sceneCount = parseInt(countEl.value);
+  if (!concept) { alert('请输入故事概念'); return; }
+
+  wfLog('Step 1: 开始生成剧本...', 'info');
+  wfSetStep(1, 'running');
+  var startBtn = wfGet('wf-start-btn');
+  if (startBtn) startBtn.disabled = true;
+
+  var systemPrompt = '你是一个专业的分镜剧本编剧。用户会给你一个故事概念，你需要将其拆分为 ' + sceneCount + ' 个场景的分镜剧本。\n\n' +
+    '严格按照以下 JSON 格式输出，不要输出任何其他内容：\n' +
+    '[\n' +
+    '  {\n' +
+    '    "title": "场景标题（简短）",\n' +
+    '    "desc": "场景描述（50字以内的中文画面描述）",\n' +
+    '    "image_prompt": "用于AI生图的英文提示词，描述该场景的关键帧画面，包含构图、光影、风格等细节，50词以内",\n' +
+    '    "video_prompt": "用于AI生视频的中文提示词，描述该场景的动态画面和运镜，30字以内"\n' +
+    '  }\n' +
+    ']\n\n' +
+    '要求：\n' +
+    '- 场景之间有连贯的故事线\n' +
+    '- image_prompt 用英文，要具体描述画面\n' +
+    '- video_prompt 用中文，要描述动态效果\n' +
+    '- 只输出JSON，不要任何其他文字';
+
+  var body = {
+    model: 'agnes-2.0-flash',
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: concept }
+    ],
+    temperature: 0.8,
+    max_tokens: 2048,
+    stream: false
+  };
+
+  const t0 = performance.now();
+  try {
+    const res = await fetch(url('/v1/chat/completions'), {
+      method: 'POST', headers: headers(), body: JSON.stringify(body)
+    });
+    const elapsed = Math.round(performance.now() - t0);
+    const data = await res.json();
+
+    if (!res.ok) {
+      wfLog('Step 1 失败: ' + res.status + ' - ' + JSON.stringify(data.error || data), 'err');
+      wfSetStep(1, 'error');
+      if (startBtn) startBtn.disabled = false;
+      return;
+    }
+
+    var raw = '';
+    if (data.choices && data.choices[0] && data.choices[0].message) {
+      raw = data.choices[0].message.content || '';
+    }
+    wfLog('剧本生成完成 (' + elapsed + 'ms)', 'ok');
+
+    // Parse JSON from response
+    var scenes;
+    try {
+      var jsonMatch = raw.match(/\[[\s\S]*\]/);
+      if (!jsonMatch) throw new Error('未找到 JSON 数组');
+      scenes = JSON.parse(jsonMatch[0]);
+    } catch (e) {
+      wfLog('剧本解析失败: ' + e.message + '，原始内容: ' + raw.substring(0, 200), 'err');
+      wfSetStep(1, 'error');
+      if (startBtn) startBtn.disabled = false;
+      return;
+    }
+
+    wfScenes = scenes.map(function(sc) {
+      return {
+        title: sc.title || '未命名场景',
+        desc: sc.desc || '',
+        image_prompt: sc.image_prompt || '',
+        video_prompt: sc.video_prompt || '',
+        imageUrl: null,
+        imgStatus: 'pending',
+        videoId: null,
+        videoUrl: null,
+        videoStatus: 'pending'
+      };
+    });
+
+    // Show script
+    var scriptBox = wfGet('wf-script-box');
+    var scriptSection = wfGet('wf-script-section');
+    if (scriptSection) scriptSection.style.display = 'block';
+    var scriptHtml = '';
+    wfScenes.forEach(function(s, i) {
+      scriptHtml += '<div class="scene-divider">🎬 场景 ' + (i + 1) + ': ' + escapeHtml(s.title) + '</div>';
+      scriptHtml += '    ' + escapeHtml(s.desc) + '\n';
+      scriptHtml += '    🖼️ 生图: ' + escapeHtml(s.image_prompt) + '\n';
+      scriptHtml += '    🎥 视频: ' + escapeHtml(s.video_prompt) + '\n\n';
+    });
+    if (scriptBox) scriptBox.innerHTML = scriptHtml;
+
+    wfSetStep(1, 'done');
+    wfLog('共 ' + wfScenes.length + ' 个场景已解析', 'ok');
+    wfRenderScenes();
+    lsSaveScenes();
+  } catch (e) {
+    wfLog('Step 1 网络错误: ' + e.message, 'err');
+    wfSetStep(1, 'error');
+  } finally {
+    if (startBtn) startBtn.disabled = false;
+  }
+}
+
+async function wfStep2() {
+  if (wfScenes.length === 0) { alert('请先生成剧本'); return; }
+
+  var modelEl = wfGet('wf-img-model');
+  var model = modelEl ? modelEl.value : 'agnes-image-2.1-flash';
+  wfLog('Step 2: 开始生成 ' + wfScenes.length + ' 张场景图片 (模型: ' + model + ')...', 'info');
+  wfSetStep(2, 'running');
+  var startBtn = wfGet('wf-start-btn');
+  if (startBtn) startBtn.disabled = true;
+
+  var ok = 0, fail = 0;
+  for (var i = 0; i < wfScenes.length; i++) {
+    var s = wfScenes[i];
+    if (s.imageUrl) { ok++; continue; } // skip already done
+    s.imgStatus = 'running';
+    wfRenderScenes();
+    wfLog('  [' + (i + 1) + '/' + wfScenes.length + '] 生成: ' + s.title + '...');
+    wfLog('  prompt: ' + s.image_prompt, 'info');
+
+    var body = {
+      model: model,
+      prompt: s.image_prompt,
+      size: '1024x1024',
+      n: 1
+    };
+
+    try {
+      var t0 = performance.now();
+      var res = await fetch(url('/v1/images/generations'), {
+        method: 'POST', headers: headers(), body: JSON.stringify(body)
+      });
+      var elapsed = Math.round(performance.now() - t0);
+      var data = await res.json();
+
+      if (!res.ok) {
+        // Log full error for debugging
+        wfLog('  [' + (i + 1) + '/' + wfScenes.length + '] Agnes raw error: ' + JSON.stringify(data), 'err');
+      }
+
+      if (res.ok && data.data && data.data[0] && data.data[0].url) {
+        s.imageUrl = data.data[0].url;
+        s.imgStatus = 'done';
+        ok++;
+        wfLog('  [' + (i + 1) + '/' + wfScenes.length + '] ✓ 完成 (' + elapsed + 'ms)', 'ok');
+      } else if (res.ok && data.data && data.data[0] && data.data[0].b64_json) {
+        s.imageUrl = 'data:image/png;base64,' + data.data[0].b64_json;
+        s.imgStatus = 'done';
+        ok++;
+        wfLog('  [' + (i + 1) + '/' + wfScenes.length + '] ✓ 完成 (b64, ' + elapsed + 'ms)', 'ok');
+      } else {
+        s.imgStatus = 'error';
+        fail++;
+        wfLog('  [' + (i + 1) + '/' + wfScenes.length + '] ✗ 失败: ' + JSON.stringify(data.error || data), 'err');
+      }
+    } catch (e) {
+      s.imgStatus = 'error';
+      fail++;
+      wfLog('  [' + (i + 1) + '/' + wfScenes.length + '] ✗ 网络错误: ' + e.message, 'err');
+    }
+    wfRenderScenes();
+    lsSaveScenes();
+  }
+
+  wfLog('Step 2 完成: 成功 ' + ok + ', 失败 ' + fail, ok === wfScenes.length ? 'ok' : 'warn');
+  wfSetStep(2, fail === wfScenes.length ? 'error' : 'done');
+  if (startBtn) startBtn.disabled = false;
+  lsSaveScenes();
+}
+
+async function wfStep3() {
+  if (wfScenes.length === 0) { alert('请先生成剧本'); return; }
+  var scenesWithImg = wfScenes.filter(function(s) { return s.imageUrl && !s.videoUrl; });
+  if (scenesWithImg.length === 0) { alert('没有可生成视频的场景（需先有图片）'); return; }
+
+  var modelEl = wfGet('wf-video-model');
+  var model = modelEl ? modelEl.value : 'agnes-video-v2.0';
+  var durEl = wfGet('wf-video-duration');
+  var duration = durEl ? durEl.value : '5';
+  var sizeEl = wfGet('wf-video-size');
+  var vSize = sizeEl ? sizeEl.value : '';
+
+  wfLog('Step 3: 开始生成 ' + scenesWithImg.length + ' 个场景视频 (模型: ' + model + ')...', 'info');
+  wfSetStep(3, 'running');
+  var startBtn = wfGet('wf-start-btn');
+  if (startBtn) startBtn.disabled = true;
+
+  // Submit all video generation requests first
+  for (var i = 0; i < scenesWithImg.length; i++) {
+    var s = scenesWithImg[i];
+    var idx = wfScenes.indexOf(s);
+    s.videoStatus = 'running';
+    wfRenderScenes();
+    wfLog('  [' + (idx + 1) + '] 提交视频生成: ' + s.title + '...');
+
+    var body = {
+      model: model,
+      input: [
+        { type: 'text', text: s.video_prompt },
+        { type: 'image', image: s.imageUrl }
+      ],
+      duration: duration || '5'
+    };
+    if (vSize) body.size = vSize;
+
+    try {
+      var t0 = performance.now();
+      var res = await fetch(url('/v1/videos/generations'), {
+        method: 'POST', headers: headers(), body: JSON.stringify(body)
+      });
+      var elapsed = Math.round(performance.now() - t0);
+      var data = await res.json();
+      if (res.ok && data.id) {
+        s.videoId = data.id;
+        wfLog('  [' + (idx + 1) + '] 已提交 (ID: ' + data.id + ', ' + elapsed + 'ms)', 'ok');
+      } else {
+        s.videoStatus = 'failed';
+        wfLog('  [' + (idx + 1) + '] 提交失败: ' + JSON.stringify(data.error || data), 'err');
+      }
+    } catch (e) {
+      s.videoStatus = 'failed';
+      wfLog('  [' + (idx + 1) + '] 网络错误: ' + e.message, 'err');
+    }
+    wfRenderScenes();
+    lsSaveScenes();
+  }
+
+  // Now poll for video status
+  var toPoll = scenesWithImg.filter(function(s) { return s.videoId; });
+  if (toPoll.length > 0) {
+    wfLog('开始轮询 ' + toPoll.length + ' 个视频状态...', 'info');
+  }
+
+  var pollInterval;
+  var pollAll = function() {
+    var allDone = true;
+    var promises = toPoll.map(function(s) {
+      if (s.videoStatus === 'completed' || s.videoStatus === 'failed') return Promise.resolve();
+      allDone = false;
+      return fetch(url('/v1/videos/' + encodeURIComponent(s.videoId)), {
+        method: 'GET', headers: headers()
+      }).then(function(res) { return res.json(); }).then(function(data) {
+        var idx = wfScenes.indexOf(s);
+        if (data.status === 'completed' && data.output && data.output[0] && data.output[0].url) {
+          s.videoUrl = data.output[0].url;
+          s.videoStatus = 'completed';
+          wfLog('  [' + (idx + 1) + '] ✓ 视频已完成!', 'ok');
+        } else if (data.status === 'failed') {
+          s.videoStatus = 'failed';
+          wfLog('  [' + (idx + 1) + '] ✗ 视频生成失败', 'err');
+        }
+      }).catch(function() {
+        // ignore poll errors, try again next round
+      });
+    });
+    return Promise.all(promises).then(function() {
+      wfRenderScenes();
+      lsSaveScenes();
+      // re-check allDone after poll
+      var reallyDone = toPoll.every(function(s) { return s.videoStatus === 'completed' || s.videoStatus === 'failed'; });
+      if (reallyDone) {
+        clearInterval(pollInterval);
+        var completed = toPoll.filter(function(s) { return s.videoStatus === 'completed'; }).length;
+        var failed = toPoll.filter(function(s) { return s.videoStatus === 'failed'; }).length;
+        wfLog('Step 3 全部完成: 成功 ' + completed + ', 失败 ' + failed, completed > 0 ? 'ok' : 'err');
+        wfSetStep(3, failed === toPoll.length ? 'error' : 'done');
+        if (startBtn) startBtn.disabled = false;
+      }
+    });
+  };
+
+  if (toPoll.length > 0) {
+    pollAll();
+    pollInterval = setInterval(function() { pollAll(); }, 5000);
+  } else {
+    wfSetStep(3, 'error');
+    if (startBtn) startBtn.disabled = false;
+  }
+}
+
+async function wfStart() {
+  wfReset();
+  await wfStep1();
+  if (wfScenes.length === 0) return;
+  await wfStep2();
+  await wfStep3();
+}
+
+function wfReset() {
+  wfScenes = [];
+  try { localStorage.removeItem(LS_KEY_SCENES); } catch(e) {}
+  var ids = ['wf-script-section', 'wf-scenes-section', 'wf-log-section'];
+  ids.forEach(function(id) { var el = wfGet(id); if (el) el.style.display = 'none'; });
+  var clearIds = ['wf-log', 'wf-scenes-grid', 'wf-script-box'];
+  clearIds.forEach(function(id) { var el = wfGet(id); if (el) el.innerHTML = ''; });
+  wfSetStep(1, 'active');
+  document.querySelectorAll('.wf-step').forEach(function(el, i) {
+    if (i > 0) el.className = 'wf-step';
+  });
+  wfLog('工作流已重置', 'info');
+}
+
+// Bind buttons directly — script is at bottom of body, DOM is already parsed
+(function() {
+  var b;
+  b = document.getElementById('wf-start-btn');
+  if (b) b.addEventListener('click', function() { wfStart().catch(function(e) { alert('wfStart error: ' + e.message); console.error(e); }); });
+  b = document.getElementById('wf-step1-btn');
+  if (b) b.addEventListener('click', function() { wfStep1().catch(function(e) { alert('wfStep1 error: ' + e.message); console.error(e); }); });
+  b = document.getElementById('wf-step2-btn');
+  if (b) b.addEventListener('click', function() { wfStep2().catch(function(e) { alert('wfStep2 error: ' + e.message); console.error(e); }); });
+  b = document.getElementById('wf-step3-btn');
+  if (b) b.addEventListener('click', function() { wfStep3().catch(function(e) { alert('wfStep3 error: ' + e.message); console.error(e); }); });
+  b = document.getElementById('wf-reset-btn');
+  if (b) b.addEventListener('click', function() { try { wfReset(); } catch(e) { alert('wfReset error: ' + e.message); } });
+})();
+
+// ==================== LocalStorage Persistence ====================
+var LS_KEY_SETTINGS = 'o4openai_settings';
+var LS_KEY_SCENES = 'o4openai_wf_scenes';
+
+function lsSaveSettings() {
+  var data = {
+    baseUrl: (document.getElementById('baseUrl').value || ''),
+    apiKey: (document.getElementById('apiKey').value || ''),
+    providerPrefix: (document.getElementById('providerPrefix').value || '')
+  };
+  try { localStorage.setItem(LS_KEY_SETTINGS, JSON.stringify(data)); } catch(e) {}
+}
+
+function lsLoadSettings() {
+  try {
+    var raw = localStorage.getItem(LS_KEY_SETTINGS);
+    if (!raw) return;
+    var data = JSON.parse(raw);
+    if (data.baseUrl) document.getElementById('baseUrl').value = data.baseUrl;
+    if (data.apiKey) document.getElementById('apiKey').value = data.apiKey;
+    if (data.providerPrefix) document.getElementById('providerPrefix').value = data.providerPrefix;
+  } catch(e) {}
+}
+
+function lsSaveScenes() {
+  try { localStorage.setItem(LS_KEY_SCENES, JSON.stringify(wfScenes)); } catch(e) {}
+}
+
+function lsLoadScenes() {
+  try {
+    var raw = localStorage.getItem(LS_KEY_SCENES);
+    if (!raw) return;
+    wfScenes = JSON.parse(raw);
+    if (wfScenes.length > 0) {
+      wfLog('从上次进度恢复 ' + wfScenes.length + ' 个场景', 'info');
+      // Show script
+      var scriptBox = wfGet('wf-script-box');
+      var scriptSection = wfGet('wf-script-section');
+      if (scriptSection) scriptSection.style.display = 'block';
+      if (scriptBox) {
+        var scriptHtml = '';
+        wfScenes.forEach(function(s, i) {
+          scriptHtml += '<div class="scene-divider">🎬 场景 ' + (i + 1) + ': ' + escapeHtml(s.title) + '</div>';
+          scriptHtml += '    ' + escapeHtml(s.desc) + '\n';
+          scriptHtml += '    🖼️ 生图: ' + escapeHtml(s.image_prompt) + '\n';
+          scriptHtml += '    🎥 视频: ' + escapeHtml(s.video_prompt) + '\n\n';
+        });
+        scriptBox.innerHTML = scriptHtml;
+      }
+      // Restore step indicators
+      var hasImages = wfScenes.some(function(s) { return !!s.imageUrl; });
+      var hasVideos = wfScenes.some(function(s) { return !!s.videoUrl; });
+      if (hasVideos) {
+        wfSetStep(3, 'running'); // step 3 in progress or done
+        var allDone = wfScenes.every(function(s) { return s.videoUrl || s.videoStatus === 'failed'; });
+        if (allDone) wfSetStep(3, 'done');
+      } else if (hasImages) {
+        wfSetStep(2, 'done');
+      } else {
+        wfSetStep(1, 'done');
+      }
+      wfRenderScenes();
+      // Auto-resume video polling if any are in progress
+      var pending = wfScenes.filter(function(s) { return s.videoId && s.videoStatus === 'running'; });
+      if (pending.length > 0) {
+        wfLog('自动恢复 ' + pending.length + ' 个视频轮询...', 'info');
+        autoResumeVideoPoll(pending);
+      }
+    }
+  } catch(e) {
+    console.error('Failed to load scenes:', e);
+  }
+}
+
+function autoResumeVideoPoll(toPoll) {
+  var modelEl = wfGet('wf-video-model');
+  var model = modelEl ? modelEl.value : 'agnes-video-v2.0';
+  var startBtn = wfGet('wf-start-btn');
+  if (startBtn) startBtn.disabled = true;
+  var pollInterval;
+  var pollAll = function() {
+    var promises = toPoll.map(function(s) {
+      if (s.videoStatus === 'completed' || s.videoStatus === 'failed') return Promise.resolve();
+      return fetch(url('/v1/videos/' + encodeURIComponent(s.videoId)), {
+        method: 'GET', headers: headers()
+      }).then(function(res) { return res.json(); }).then(function(data) {
+        var idx = wfScenes.indexOf(s);
+        if (data.status === 'completed' && data.output && data.output[0] && data.output[0].url) {
+          s.videoUrl = data.output[0].url;
+          s.videoStatus = 'completed';
+          wfLog('  [' + (idx + 1) + '] ✓ 视频已完成!', 'ok');
+          lsSaveScenes();
+        } else if (data.status === 'failed') {
+          s.videoStatus = 'failed';
+          wfLog('  [' + (idx + 1) + '] ✗ 视频生成失败', 'err');
+          lsSaveScenes();
+        }
+      }).catch(function() {});
+    });
+    return Promise.all(promises).then(function() {
+      wfRenderScenes();
+      var reallyDone = toPoll.every(function(s) { return s.videoStatus === 'completed' || s.videoStatus === 'failed'; });
+      if (reallyDone) {
+        clearInterval(pollInterval);
+        var completed = toPoll.filter(function(s) { return s.videoStatus === 'completed'; }).length;
+        var failed = toPoll.filter(function(s) { return s.videoStatus === 'failed'; }).length;
+        wfLog('视频轮询完成: 成功 ' + completed + ', 失败 ' + failed, completed > 0 ? 'ok' : 'err');
+        wfSetStep(3, failed === toPoll.length ? 'error' : 'done');
+        if (startBtn) startBtn.disabled = false;
+      }
+    });
+  };
+  pollAll();
+  pollInterval = setInterval(function() { pollAll(); }, 5000);
+}
+
+// ==================== Init ====================
+window.addEventListener('DOMContentLoaded', function() {
+  // Restore settings from localStorage
+  lsLoadSettings();
+  // Bind settings change listeners
+  ['baseUrl', 'apiKey', 'providerPrefix'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('change', lsSaveSettings);
+    if (el) el.addEventListener('input', lsSaveSettings);
+  });
+  // Restore story factory scenes
+  lsLoadScenes();
+  // Health check
+  checkHealth();
+});
+</script>
+
+</body>
+</html>
