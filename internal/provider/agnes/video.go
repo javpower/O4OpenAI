@@ -341,19 +341,21 @@ func pickModel(r *AgnesVideoResponse, fallback string) string {
 	return fallback
 }
 
-// normalizeStatus maps Agnes statuses to OpenAI-style lower-case tokens
+// normalizeStatus maps Agnes statuses to OpenAI Video API status values.
+// OpenAI Video API: queued | in_progress | completed | failed | expired
 // Agnes: queued | in_progress | completed | failed
-// OpenAI: queued | processing | completed | failed (we adopt "processing" for in_progress)
 func normalizeStatus(s string) string {
 	switch strings.ToLower(s) {
 	case "queued":
 		return "queued"
 	case "in_progress", "processing", "running":
-		return "processing"
+		return "in_progress"
 	case "completed", "succeeded", "success":
 		return "completed"
 	case "failed", "error", "cancelled":
 		return "failed"
+	case "expired":
+		return "expired"
 	default:
 		return s
 	}

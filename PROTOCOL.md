@@ -41,22 +41,22 @@
 | 端点 | 客户端输入 | 网关处理 | 转发给 Provider |
 |------|-----------|---------|---------------|
 | **图生图** `/v1/images/edits` | 公网 URL | 透传 | URL 原样 |
-| | `data:image/png;base64,...` | 透传 | Data URI 原样 |
-| | 纯 base64 | 自动包装为 Data URI | `data:image/png;base64,<原内容>` |
+| | `data:image/png;base64,...` | 转为临时 URL | `http://<gateway>/_temp/images/<hash>` |
+| | 纯 base64 | 自动包装为 Data URI，再转为临时 URL | `http://<gateway>/_temp/images/<hash>` |
 | **图生视频** `/v1/videos/generations` | 公网 URL | 透传 | URL 原样 |
 | | `data:image/png;base64,...` | **存为本地临时文件** | `http://<gateway>/_temp/images/<hash>` |
 | | 纯 base64 | **先包装为 Data URI，再存为临时文件** | `http://<gateway>/_temp/images/<hash>` |
 
-#### 为什么图生视频要转临时 URL？
+#### 为什么图生视频和图生图都要转临时 URL？
 
 | 维度 | 图生图 | 图生视频 |
 |------|--------|---------|
 | 上游端点 | `POST /v1/images/generations` | `POST /v1/videos` |
-| `image` 字段 | 数组，可放 URL / Data URI | 单值，**必须是可 fetch 的 URL** |
-| 上游 worker 怎么拿到图片 | 直接读请求体 | HTTP GET 拉取 |
+| `image` 字段 | 数组，支持 URL / Data URI | 单值，**必须是可 fetch 的 URL** |
+| Data URI 处理 | 转为临时 URL | 转为临时 URL |
 | 请求体大小 | 几 MB（图片本身） | 几十 MB+（含视频参数） |
 
-**关键差异**：图生视频的上游 worker **必须通过 HTTP 拉取**输入图（Data URI 没法被 GET）。所以网关把 base64 存到本地、生成临时 URL，Agnes 再从网关拉。
+网关统一将所有 Data URI / base64 输入转换为临时 URL，确保上游 Provider 可以通过 HTTP GET 拉取。
 
 #### 临时文件生命周期
 
@@ -261,11 +261,27 @@ Authorization: Bearer sk-xxx
 | 客户端传入 | 网关处理 | 转发给 Agnes（`image` 数组元素） |
 |-----------|---------|--------------------------------|
 | `"https://..."` URL | 直接转发 | URL 原样 |
-| `"data:image/png;base64,..."` Data URI | 直接转发 | Data URI 原样 |
-| 纯 base64（≥64 字符、仅 base64 字符） | 自动包装 | `"data:image/png;base64,<原内容>"` |
+| `"data:image/png;base64,..."` Data URI | 转为临时 URL | `http://<gateway>/_temp/images/<hash>` |
+| 纯 base64（≥64 字符、仅 base64 字符） | 自动包装为 Data URI，再转为临时 URL | `http://<gateway>/_temp/images/<hash>` |
 | 顶层 `mask` 字段 | 追加到 `image` 数组 | `mask` 原文（Agnes 不识别，行为未定义） |
 
-> 重要：图生图的所有 base64 输入**不会**保存到本地（不像图生视频），而是直接在请求体里透传给上游。
+> 注意：图生图的 Data URI / base64 输入会通过 `base64Handler` 转换为临时 URL（与图生视频行为一致），确保上游 Provider 可通过 HTTP GET 拉取。
+
+**多图上传**（multipart/form-data）：
+
+网关支持通过 `multipart/form-data` 一次上传最多 16 张图片：
+
+| 文件数量 | 处理方式 |
+|---------|---------|
+| 1 个 `image` 文件 | 兼容单图路径，设置 `req.Image` |
+| 2–16 个 `image` 文件 | 填充 `req.Images` 数组，同时设置 `req.Image` 为第一张图（向后兼容） |
+| >16 个 | 返回错误："too many images: maximum 16 allowed" |
+
+JSON 模式仅支持单图（`image` 字段）。
+
+**`quality` 参数**：
+
+图生图请求中的 `quality` 字段会透传给 Agnes（用于 ArcReel SDK 等场景），若客户端未传则不设置。
 
 **Provider → 网关 → 客户端**
 
@@ -390,7 +406,7 @@ Authorization: Bearer sk-xxx
   "id": "task_xxx",
   "object": "video",
   "created_at": 1780000000,
-  "status": "queued",   // queued → processing → completed
+  "status": "queued",   // queued → in_progress → completed / failed / expired
   "model": "agnes-video-v2.0"
 }
 ```
@@ -534,7 +550,7 @@ Authorization: Bearer sk-xxx
 |--------------|-----------|------|
 | `video_id` 或 `task_id` 或 `id` | `id` | 优先 `video_id`（新接口 ID） |
 | `model` | `model` | 透传（OpenAI 模型名） |
-| `status` | `status` | 归一化：`in_progress` → `processing`、`succeeded` → `completed` |
+| `status` | `status` | 归一化为 OpenAI 标准值：`in_progress`/`processing`/`running` → `in_progress`，`succeeded`/`success` → `completed`，`expired` → `expired` |
 | `video_url` | `output[0].url` | **新字段**，优先使用 |
 | `remixed_from_video_id` | `output[0].url` | 兼容旧字段，仅当 URL 以 `http(s)://` 开头时填充 |
 | `seconds` | `output[0].duration` | 字符串转浮点 |
@@ -542,6 +558,59 @@ Authorization: Bearer sk-xxx
 **关键 trick**：
 
 ⚠️ Agnes 创建响应里 `remixed_from_video_id` 是 **LiteLLM 编码的占位符**（形如 `video_<base64>`），**不是真实 URL**。网关通过检查 URL 前缀来过滤掉这种占位符，避免在 `output.url` 中返回假 URL。新接口用 `video_url` 字段直接返回真实 URL。
+
+### GET /v1/videos/:id/content（下载视频）
+
+兼容 OpenAI Python SDK 的 `client.videos.download_content()` 方法。
+
+**客户端 → 网关**
+
+```http
+GET /v1/videos/video_xxx/content HTTP/1.1
+Authorization: Bearer sk-xxx
+```
+
+**网关处理**：
+
+1. 调用 `VideoRetrieve` 获取视频状态和输出 URL
+2. 视频未完成或无输出 URL → 返回 **400** `video_not_ready`
+3. 视频已完成 → 返回 **302** 重定向到实际视频 URL（不做代理，避免网关传输大文件）
+4. 视频 ID 不存在 → 返回 **404**
+
+**网关 → 客户端**（视频已完成）
+
+```http
+HTTP/1.1 302 Found
+Location: https://storage.googleapis.com/.../video.mp4
+```
+
+**网关 → 客户端**（视频未完成）
+
+```json
+{
+  "error": {
+    "message": "video is not ready yet, current status: in_progress",
+    "type": "invalid_request_error",
+    "code": "video_not_ready"
+  }
+}
+```
+
+#### Multipart 表单支持（视频生成）
+
+`POST /v1/videos/generations` 同时支持 `application/json` 和 `multipart/form-data` 两种 Content-Type。multipart 模式兼容 OpenAI Python SDK 的 `client.videos.create()` 方法。
+
+**Multipart 字段映射**：
+
+| 表单字段 | 类型 | 映射到 |
+|---------|------|--------|
+| `model` | string | `req.Model` |
+| `prompt` | string | `req.Instructions`（指令） |
+| `seconds` | string | `req.Duration`（时长） |
+| `size` | string | `req.Size`（分辨率） |
+| `input_reference` | file(s) | 每个 file 读取后 base64 编码，追加到 `req.Input` 作为 `{type: "image"}` |
+
+> JSON 模式使用 `input` 数组（含 `type: "text"` 和 `type: "image"` 项），multipart 模式使用独立的表单字段。
 
 ---
 
@@ -580,12 +649,13 @@ GET /v1/models
 |------------|---------|
 | `model` | 重写为 `provider_model`（按 `config.yaml` 映射） |
 | `response_format`（图生图） | 移入 `extra_body.response_format` |
+| `quality`（图生图） | 透传给 Provider（用于 ArcReel SDK） |
 | `size`（图片） | 原样转发 |
 | `size`（视频） | 拆分为 `width`、`height` |
 | `duration`（视频） | 换算为 `num_frames`（×24fps），四舍五入到 `8n+1` |
 | `input[].text` | 拼接到 `prompt` |
 | `input[].image` | 单图：`image`；多图：`extra_body.image`；`extra_body.mode=keyframes`（自动） |
-| `image`（图生图 JSON） | 放入 `image` 数组；纯 base64 自动包装 Data URI |
+| `image`（图生图 JSON） | 放入 `image` 数组；Data URI / base64 转为临时 URL |
 | `mask`（图生图） | 追加到 `image` 数组（Agnes 不识别） |
 | `stream` | 透传（影响 SSE 行为） |
 | `n`、`temperature` 等 | 透传 |
@@ -596,13 +666,14 @@ GET /v1/models
 |---------|----------|
 | `remixed_from_video_id` | `output[0].url`（仅当是真实 URL） |
 | `task_id` / `id` | `id` |
-| `in_progress` | `processing` |
-| `succeeded` | `completed` |
+| `in_progress` / `processing` / `running` | `in_progress`（归一化为 OpenAI 标准值） |
+| `succeeded` / `success` | `completed` |
+| `expired` | `expired` |
 | `seconds`（字符串） | `output[0].duration`（浮点） |
 
 ### 客户端无法感知的网关行为
 
-1. **临时图片保存**（仅图生视频触发）：任何 base64 输入（Data URI 或纯 base64）都被解码后存到本地 `/_temp/images/<hash>`，生成 5 分钟过期的临时 URL，Agnes worker 通过 HTTP 拉取后再删除
+1. **临时图片保存**（图生图和图生视频均触发）：任何 base64 输入（Data URI 或纯 base64）都被解码后存到本地 `/_temp/images/<hash>`，生成 5 分钟过期的临时 URL，Agnes worker 通过 HTTP 拉取后再删除
 2. **请求上下文跟踪**：每个请求生成唯一 `RequestContext`，请求结束立即清理临时图片
 3. **错误聚合**：所有 Provider 错误统一封装为 `provider.ProviderError`，携带原始 HTTP 状态码
 4. **错误脱敏**：返回给客户端的错误消息**不包含**上游原始 body（避免泄漏 request ID 等内部信息），完整 body 仅截断到 200 字节后写入服务端日志

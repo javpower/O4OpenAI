@@ -20,9 +20,10 @@ import (
 //	/{provider}/v1/images/generations
 //
 // This way, clients just change the base URL to switch providers:
-//   base_url = "https://my-gateway.com"            → auto
-//   base_url = "https://my-gateway.com/agnes"      → force Agnes
-//   base_url = "https://my-gateway.com/openai"     → force OpenAI
+//
+//	base_url = "https://my-gateway.com"            → auto
+//	base_url = "https://my-gateway.com/agnes"      → force Agnes
+//	base_url = "https://my-gateway.com/openai"     → force OpenAI
 func SetupRouter(
 	engine *gin.Engine,
 	registry *provider.Registry,
@@ -67,6 +68,7 @@ func registerAPIRoutes(rg *gin.RouterGroup, registry *provider.Registry, base64H
 	videoHandler := NewVideoHandler(registry, base64Handler, logger, forcedProvider)
 	rg.POST("/videos/generations", videoHandler.HandleGenerate)
 	rg.GET("/videos/:id", videoHandler.HandleRetrieve)
+	rg.GET("/videos/:id/content", videoHandler.HandleDownloadContent)
 
 	modelsHandler := NewModelsHandler(registry, logger)
 	rg.GET("/models", modelsHandler.HandleList)

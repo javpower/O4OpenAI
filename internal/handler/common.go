@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/http"
@@ -148,4 +149,10 @@ func anthropicErrorTypeForStatus(status int) string {
 	default:
 		return "api_error"
 	}
+}
+
+// encodeToBase64String encodes bytes to base64 string.
+// Shared across image and video handlers for multipart file processing.
+func encodeToBase64String(data []byte) string {
+	return base64.StdEncoding.EncodeToString(data)
 }

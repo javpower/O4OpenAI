@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
@@ -18,10 +17,10 @@ import (
 
 // ImageHandler handles image-related requests
 type ImageHandler struct {
-	registry        *provider.Registry
-	logger          *zap.Logger
-	base64Handler   *utils.Base64Handler
-	forcedProvider  string
+	registry       *provider.Registry
+	logger         *zap.Logger
+	base64Handler  *utils.Base64Handler
+	forcedProvider string
 }
 
 // NewImageHandler creates a new image handler
@@ -276,7 +275,10 @@ func (h *ImageHandler) parseMultipartGenerate(c *gin.Context, req *model.ImageGe
 	return nil
 }
 
-// parseMultipartEdit parses multipart form data for image editing
+// parseMultipartEdit parses multipart form data for image editing.
+// Supports both single and multiple image file uploads.
+// When multiple files are provided under the "image" key, all are collected
+// into req.Images for downstream multi-image processing (e.g. ArcReel SDK).
 func (h *ImageHandler) parseMultipartEdit(c *gin.Context, req *model.ImageEditRequest) error {
 	form, err := c.MultipartForm()
 	if err != nil {
@@ -300,19 +302,46 @@ func (h *ImageHandler) parseMultipartEdit(c *gin.Context, req *model.ImageEditRe
 		fmt.Sscanf(values[0], "%d", &n)
 		req.N = &n
 	}
+	if values := form.Value["quality"]; len(values) > 0 {
+		req.Quality = values[0]
+	}
 
-	// Parse file uploads - convert to base64
+	// Parse image file uploads — support multiple images (up to 16)
 	if files := form.File["image"]; len(files) > 0 {
-		file, err := files[0].Open()
-		if err != nil {
-			return fmt.Errorf("failed to open image file: %w", err)
+		if len(files) > 16 {
+			return fmt.Errorf("too many images: maximum 16 allowed, got %d", len(files))
 		}
-		defer file.Close()
-		data, err := io.ReadAll(file)
-		if err != nil {
-			return fmt.Errorf("failed to read image file: %w", err)
+		if len(files) == 1 {
+			// Single file: backward-compatible path
+			file, err := files[0].Open()
+			if err != nil {
+				return fmt.Errorf("failed to open image file: %w", err)
+			}
+			defer file.Close()
+			data, err := io.ReadAll(file)
+			if err != nil {
+				return fmt.Errorf("failed to read image file: %w", err)
+			}
+			req.Image = encodeToBase64String(data)
+		} else {
+			// Multiple files: populate Images slice
+			images := make([]string, 0, len(files))
+			for i, fh := range files {
+				file, err := fh.Open()
+				if err != nil {
+					return fmt.Errorf("failed to open image file %d: %w", i, err)
+				}
+				data, err := io.ReadAll(file)
+				file.Close()
+				if err != nil {
+					return fmt.Errorf("failed to read image file %d: %w", i, err)
+				}
+				images = append(images, encodeToBase64String(data))
+			}
+			req.Images = images
+			// Also set Image to the first for any code that only checks Image
+			req.Image = images[0]
 		}
-		req.Image = encodeToBase64String(data)
 	}
 
 	if files := form.File["mask"]; len(files) > 0 {
@@ -368,9 +397,3 @@ func (h *ImageHandler) parseMultipartVariation(c *gin.Context, req *model.ImageV
 
 	return nil
 }
-
-// encodeToBase64String encodes bytes to base64 string
-func encodeToBase64String(data []byte) string {
-	return base64.StdEncoding.EncodeToString(data)
-}
-

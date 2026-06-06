@@ -14,6 +14,8 @@
 -  **Thinking 模式** — 支持 Agnes 原生的 Thinking 能力（Anthropic 和 OpenAI 两种格式）
 -  **工具调用** — 支持完整的 function calling / tool_use 工作流
 -  **图生图、首尾帧视频** — 走 Agnes 同一接口，OpenAI 风格封装
+-  **Multipart 表单支持** — 图片编辑和视频生成支持 `multipart/form-data`，兼容 OpenAI Python SDK
+-  **多图上传** — 图生图支持一次上传最多 16 张图片
 
 ## 支持的 OpenAI 接口
 
@@ -25,6 +27,7 @@
 | Image Variation | POST | `/v1/images/variations` | 图片变体（Agnes 暂未支持） |
 | Video Generation | POST | `/v1/videos/generations` | 异步任务：文生视频 / 图生视频 / 首尾帧 |
 | Video Status | GET | `/v1/videos/:id` | 轮询视频任务状态 |
+| Video Download | GET | `/v1/videos/:id/content` | 下载视频文件（302 重定向到视频 URL） |
 | List Models | GET | `/v1/models` | 列出可用模型 |
 | Get Model | GET | `/v1/models/:model` | 获取模型信息 |
 
@@ -101,6 +104,8 @@ providers:
         provider_model: "agnes-1.5-flash"
       - external_model: "agnes-2.0-flash"
         provider_model: "agnes-2.0-flash"
+      - external_model: "agnes-image-2.0-flash"
+        provider_model: "agnes-image-2.0-flash"
       - external_model: "agnes-image-2.1-flash"
         provider_model: "agnes-image-2.1-flash"
       - external_model: "agnes-video-v2.0"
@@ -234,7 +239,7 @@ curl http://localhost:1241/v1/videos/$TASK_ID \
   -H "Authorization: Bearer YOUR_AGNES_API_KEY"
 ```
 
-状态流转：`queued` → `processing` → `completed` / `failed`。
+状态流转：`queued` → `in_progress` → `completed` / `failed` / `expired`。
 
 `completed` 时返回：
 
@@ -251,7 +256,16 @@ curl http://localhost:1241/v1/videos/$TASK_ID \
 }
 ```
 
-### 9. 列出模型
+### 9. 下载视频内容
+
+```bash
+# 视频未完成时返回 video_not_ready 错误；完成后 302 重定向到实际视频 URL
+curl -L http://localhost:1241/v1/videos/$TASK_ID/content \
+  -H "Authorization: Bearer YOUR_AGNES_API_KEY" \
+  -o video.mp4
+```
+
+### 10. 列出模型
 
 ```bash
 curl http://localhost:1241/v1/models
@@ -259,7 +273,7 @@ curl http://localhost:1241/v1/models
 
 ## Anthropic 兼容接口测试
 
-### 10. Anthropic Messages（非流式）
+### 11. Anthropic Messages（非流式）
 
 ```bash
 curl http://localhost:1241/v1/messages \
@@ -287,7 +301,7 @@ curl http://localhost:1241/v1/messages \
 }
 ```
 
-### 11. Anthropic Messages（流式 SSE）
+### 12. Anthropic Messages（流式 SSE）
 
 ```bash
 curl -N http://localhost:1241/v1/messages \
@@ -302,7 +316,7 @@ curl -N http://localhost:1241/v1/messages \
   }'
 ```
 
-### 12. Anthropic Messages（带 system prompt）
+### 13. Anthropic Messages（带 system prompt）
 
 ```bash
 curl http://localhost:1241/v1/messages \
@@ -317,7 +331,7 @@ curl http://localhost:1241/v1/messages \
   }'
 ```
 
-### 13. Anthropic Messages（带 Thinking 模式）
+### 14. Anthropic Messages（带 Thinking 模式）
 
 ```bash
 curl http://localhost:1241/v1/messages \
@@ -332,7 +346,7 @@ curl http://localhost:1241/v1/messages \
   }'
 ```
 
-### 14. 使用 Anthropic Python SDK
+### 15. 使用 Anthropic Python SDK
 
 ```python
 import anthropic
@@ -482,7 +496,7 @@ type Provider interface {
 | **图生图端点** | Agnes 用 `/images/generations` + `image` 数组，而非 OpenAI 的 `/images/edits` |
 | **视频端点** | Agnes 用 `POST /videos` + 异步轮询 `GET /videos/{task_id}` |
 | **视频 URL 字段** | Agnes 用 `remixed_from_video_id`（名字反直觉），我们把它映射到 `output[].url` |
-| **视频状态枚举** | Agnes: `queued`/`in_progress`/`completed`/`failed` → OpenAI: `queued`/`processing`/`completed`/`failed` |
+| **视频状态枚举** | Agnes: `queued`/`in_progress`/`processing`/`running`/`completed`/`failed`/`expired` → 归一化为 OpenAI 标准: `queued`/`in_progress`/`completed`/`failed`/`expired` |
 | **response_format 位置** | 图生图的 `response_format` 必须放在 `extra_body` 里 |
 | **图片输入** | `image` 数组支持公网 URL、Data URI、纯 base64 |
 | **`num_frames` 约束** | 必须是 `8n+1`，≤ 441；网关自动四舍五入 |

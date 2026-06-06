@@ -11,33 +11,33 @@ import "encoding/json"
 
 // ChatCompletionRequest represents an OpenAI chat completion request
 type ChatCompletionRequest struct {
-	Model            string                          `json:"model"`
-	Messages         []ChatCompletionMessageParam    `json:"messages"`
-	Temperature      *float64                        `json:"temperature,omitempty"`
-	TopP             *float64                        `json:"top_p,omitempty"`
-	N                *int                            `json:"n,omitempty"`
-	MaxTokens        *int                            `json:"max_tokens,omitempty"`
-	MaxCompletionTokens *int                         `json:"max_completion_tokens,omitempty"`
-	Stream           bool                            `json:"stream,omitempty"`
-	StreamOptions    *ChatCompletionStreamOptions    `json:"stream_options,omitempty"`
-	Stop             json.RawMessage                 `json:"stop,omitempty"` // string or []string
-	FrequencyPenalty *float64                        `json:"frequency_penalty,omitempty"`
-	PresencePenalty  *float64                        `json:"presence_penalty,omitempty"`
-	Seed             *int64                          `json:"seed,omitempty"`
-	Logprobs         *bool                           `json:"logprobs,omitempty"`
-	TopLogprobs      *int                            `json:"top_logprobs,omitempty"`
-	ResponseFormat   json.RawMessage                 `json:"response_format,omitempty"`
-	Tools            []Tool                          `json:"tools,omitempty"`
-	ToolChoice       json.RawMessage                 `json:"tool_choice,omitempty"`
-	Modalities       []string                        `json:"modalities,omitempty"`
-	Audio            *ChatCompletionAudioParam       `json:"audio,omitempty"`
-	Prediction       *ChatCompletionPredictionContent `json:"prediction,omitempty"`
-	ServiceTier      string                          `json:"service_tier,omitempty"`
-	User             string                          `json:"user,omitempty"`
+	Model               string                           `json:"model"`
+	Messages            []ChatCompletionMessageParam     `json:"messages"`
+	Temperature         *float64                         `json:"temperature,omitempty"`
+	TopP                *float64                         `json:"top_p,omitempty"`
+	N                   *int                             `json:"n,omitempty"`
+	MaxTokens           *int                             `json:"max_tokens,omitempty"`
+	MaxCompletionTokens *int                             `json:"max_completion_tokens,omitempty"`
+	Stream              bool                             `json:"stream,omitempty"`
+	StreamOptions       *ChatCompletionStreamOptions     `json:"stream_options,omitempty"`
+	Stop                json.RawMessage                  `json:"stop,omitempty"` // string or []string
+	FrequencyPenalty    *float64                         `json:"frequency_penalty,omitempty"`
+	PresencePenalty     *float64                         `json:"presence_penalty,omitempty"`
+	Seed                *int64                           `json:"seed,omitempty"`
+	Logprobs            *bool                            `json:"logprobs,omitempty"`
+	TopLogprobs         *int                             `json:"top_logprobs,omitempty"`
+	ResponseFormat      json.RawMessage                  `json:"response_format,omitempty"`
+	Tools               []Tool                           `json:"tools,omitempty"`
+	ToolChoice          json.RawMessage                  `json:"tool_choice,omitempty"`
+	Modalities          []string                         `json:"modalities,omitempty"`
+	Audio               *ChatCompletionAudioParam        `json:"audio,omitempty"`
+	Prediction          *ChatCompletionPredictionContent `json:"prediction,omitempty"`
+	ServiceTier         string                           `json:"service_tier,omitempty"`
+	User                string                           `json:"user,omitempty"`
 
 	// Agnes-specific extensions (transparent passthrough)
 	ChatTemplateKwargs json.RawMessage `json:"chat_template_kwargs,omitempty"` // {"enable_thinking": true}
-	Thinking           json.RawMessage `json:"thinking,omitempty"`              // {"type":"enabled","budget_tokens":2048}
+	Thinking           json.RawMessage `json:"thinking,omitempty"`             // {"type":"enabled","budget_tokens":2048}
 
 	// Provider-specific extra params passed through
 	Extra map[string]interface{} `json:"-"`
@@ -58,12 +58,12 @@ type ChatCompletionMessageParam struct {
 
 // ChatCompletionContentPart represents a content part in a message
 type ChatCompletionContentPart struct {
-	Type     string               `json:"type"`
-	Text     string               `json:"text,omitempty"`
-	ImageURL *ImageURL            `json:"image_url,omitempty"`
-	InputAudio *InputAudio        `json:"input_audio,omitempty"`
-	File     *FileContent         `json:"file,omitempty"`
-	Refusal  string               `json:"refusal,omitempty"`
+	Type       string       `json:"type"`
+	Text       string       `json:"text,omitempty"`
+	ImageURL   *ImageURL    `json:"image_url,omitempty"`
+	InputAudio *InputAudio  `json:"input_audio,omitempty"`
+	File       *FileContent `json:"file,omitempty"`
+	Refusal    string       `json:"refusal,omitempty"`
 }
 
 // ImageURL represents an image URL content part
@@ -107,7 +107,7 @@ type ChatCompletionPredictionContent struct {
 
 // ChatCompletionStreamOptions represents streaming options
 type ChatCompletionStreamOptions struct {
-	IncludeUsage      *bool `json:"include_usage,omitempty"`
+	IncludeUsage       *bool `json:"include_usage,omitempty"`
 	IncludeObfuscation *bool `json:"include_obfuscation,omitempty"`
 }
 
@@ -134,39 +134,39 @@ type ToolCall struct {
 
 // ChatCompletionResponse represents an OpenAI chat completion response
 type ChatCompletionResponse struct {
-	ID               string                 `json:"id"`
-	Object           string                 `json:"object"` // "chat.completion"
-	Created          int64                  `json:"created"`
-	Model            string                 `json:"model"`
-	Choices          []ChatCompletionChoice `json:"choices"`
-	Usage            *CompletionUsage       `json:"usage,omitempty"`
-	ServiceTier      string                 `json:"service_tier,omitempty"`
-	SystemFingerprint string                `json:"system_fingerprint,omitempty"`
+	ID                string                 `json:"id"`
+	Object            string                 `json:"object"` // "chat.completion"
+	Created           int64                  `json:"created"`
+	Model             string                 `json:"model"`
+	Choices           []ChatCompletionChoice `json:"choices"`
+	Usage             *CompletionUsage       `json:"usage,omitempty"`
+	ServiceTier       string                 `json:"service_tier,omitempty"`
+	SystemFingerprint string                 `json:"system_fingerprint,omitempty"`
 }
 
 // ChatCompletionChoice represents a choice in the response
 type ChatCompletionChoice struct {
-	Index        int                       `json:"index"`
-	Message      ChatCompletionMessage     `json:"message"`
-	FinishReason string                    `json:"finish_reason"`
-	Logprobs     *ChatCompletionLogprobs   `json:"logprobs,omitempty"`
+	Index        int                     `json:"index"`
+	Message      ChatCompletionMessage   `json:"message"`
+	FinishReason string                  `json:"finish_reason"`
+	Logprobs     *ChatCompletionLogprobs `json:"logprobs,omitempty"`
 }
 
 // ChatCompletionMessage represents the assistant's message in the response
 type ChatCompletionMessage struct {
-	Role         string          `json:"role"`
-	Content      json.RawMessage `json:"content,omitempty"`
-	Refusal      string          `json:"refusal,omitempty"`
-	ToolCalls    []ToolCall      `json:"tool_calls,omitempty"`
+	Role         string               `json:"role"`
+	Content      json.RawMessage      `json:"content,omitempty"`
+	Refusal      string               `json:"refusal,omitempty"`
+	ToolCalls    []ToolCall           `json:"tool_calls,omitempty"`
 	Audio        *ChatCompletionAudio `json:"audio,omitempty"`
-	Annotations  []Annotation    `json:"annotations,omitempty"`
-	FunctionCall *FunctionCall   `json:"function_call,omitempty"`
+	Annotations  []Annotation         `json:"annotations,omitempty"`
+	FunctionCall *FunctionCall        `json:"function_call,omitempty"`
 }
 
 // Annotation represents a URL citation annotation
 type Annotation struct {
-	Type         string      `json:"type"`
-	URLCitation  *URLCitation `json:"url_citation,omitempty"`
+	Type        string       `json:"type"`
+	URLCitation *URLCitation `json:"url_citation,omitempty"`
 }
 
 // URLCitation represents a URL citation
@@ -191,10 +191,10 @@ type ChatCompletionLogprobs struct {
 
 // TokenLogprob represents a token's log probability
 type TokenLogprob struct {
-	Token       string           `json:"token"`
-	Logprob     float64          `json:"logprob"`
-	Bytes       []int            `json:"bytes,omitempty"`
-	TopLogprobs []TopLogprob     `json:"top_logprobs"`
+	Token       string       `json:"token"`
+	Logprob     float64      `json:"logprob"`
+	Bytes       []int        `json:"bytes,omitempty"`
+	TopLogprobs []TopLogprob `json:"top_logprobs"`
 }
 
 // TopLogprob represents a top log probability entry
@@ -206,9 +206,9 @@ type TopLogprob struct {
 
 // CompletionUsage represents token usage statistics
 type CompletionUsage struct {
-	PromptTokens     int                  `json:"prompt_tokens"`
-	CompletionTokens int                  `json:"completion_tokens"`
-	TotalTokens      int                  `json:"total_tokens"`
+	PromptTokens            int           `json:"prompt_tokens"`
+	CompletionTokens        int           `json:"completion_tokens"`
+	TotalTokens             int           `json:"total_tokens"`
 	PromptTokensDetails     *TokenDetails `json:"prompt_tokens_details,omitempty"`
 	CompletionTokensDetails *TokenDetails `json:"completion_tokens_details,omitempty"`
 }
@@ -225,30 +225,30 @@ type TokenDetails struct {
 
 // ChatCompletionChunk represents a streamed chunk of a chat completion response
 type ChatCompletionChunk struct {
-	ID               string                  `json:"id"`
-	Object           string                  `json:"object"` // "chat.completion.chunk"
-	Created          int64                   `json:"created"`
-	Model            string                  `json:"model"`
-	Choices          []ChatCompletionChunkChoice `json:"choices"`
-	Usage            *CompletionUsage        `json:"usage,omitempty"`
-	ServiceTier      string                  `json:"service_tier,omitempty"`
-	SystemFingerprint string                 `json:"system_fingerprint,omitempty"`
+	ID                string                      `json:"id"`
+	Object            string                      `json:"object"` // "chat.completion.chunk"
+	Created           int64                       `json:"created"`
+	Model             string                      `json:"model"`
+	Choices           []ChatCompletionChunkChoice `json:"choices"`
+	Usage             *CompletionUsage            `json:"usage,omitempty"`
+	ServiceTier       string                      `json:"service_tier,omitempty"`
+	SystemFingerprint string                      `json:"system_fingerprint,omitempty"`
 }
 
 // ChatCompletionChunkChoice represents a choice in a streamed chunk
 type ChatCompletionChunkChoice struct {
-	Index        int                          `json:"index"`
-	Delta        ChatCompletionChunkDelta     `json:"delta"`
-	FinishReason *string                      `json:"finish_reason"`
-	Logprobs     *ChatCompletionLogprobs      `json:"logprobs,omitempty"`
+	Index        int                      `json:"index"`
+	Delta        ChatCompletionChunkDelta `json:"delta"`
+	FinishReason *string                  `json:"finish_reason"`
+	Logprobs     *ChatCompletionLogprobs  `json:"logprobs,omitempty"`
 }
 
 // ChatCompletionChunkDelta represents the delta in a streamed chunk
 type ChatCompletionChunkDelta struct {
-	Role         string       `json:"role,omitempty"`
-	Content      *string      `json:"content,omitempty"`
-	Refusal      *string      `json:"refusal,omitempty"`
-	ToolCalls    []ToolCall   `json:"tool_calls,omitempty"`
+	Role         string        `json:"role,omitempty"`
+	Content      *string       `json:"content,omitempty"`
+	Refusal      *string       `json:"refusal,omitempty"`
+	ToolCalls    []ToolCall    `json:"tool_calls,omitempty"`
 	FunctionCall *FunctionCall `json:"function_call,omitempty"`
 }
 
@@ -259,31 +259,32 @@ type ImageGenerationRequest struct {
 	Model          string `json:"model,omitempty"`
 	Prompt         string `json:"prompt"`
 	N              *int   `json:"n,omitempty"`
-	Size           string `json:"size,omitempty"` // 1024x1024, 1024x1536, 1536x1024
-	Quality        string `json:"quality,omitempty"` // low, medium, high, auto, standard, hd
+	Size           string `json:"size,omitempty"`            // 1024x1024, 1024x1536, 1536x1024
+	Quality        string `json:"quality,omitempty"`         // low, medium, high, auto, standard, hd
 	ResponseFormat string `json:"response_format,omitempty"` // url, b64_json
-	Style          string `json:"style,omitempty"` // vivid, natural
+	Style          string `json:"style,omitempty"`           // vivid, natural
 	User           string `json:"user,omitempty"`
-	Background     string `json:"background,omitempty"` // transparent, opaque, auto
+	Background     string `json:"background,omitempty"`    // transparent, opaque, auto
 	OutputFormat   string `json:"output_format,omitempty"` // png, webp, jpeg
-	Moderation     string `json:"moderation,omitempty"` // auto, low
+	Moderation     string `json:"moderation,omitempty"`    // auto, low
 	// dall-e-2 specific
-	Mask           string `json:"mask,omitempty"` // base64 or file
+	Mask string `json:"mask,omitempty"` // base64 or file
 }
 
 // ImageEditRequest represents an OpenAI image edit request
 type ImageEditRequest struct {
-	Model          string `json:"model,omitempty"`
-	Image          string `json:"image"` // base64 or file content
-	Prompt         string `json:"prompt"`
-	Mask           string `json:"mask,omitempty"` // base64 or file content
-	N              *int   `json:"n,omitempty"`
-	Size           string `json:"size,omitempty"`
-	ResponseFormat string `json:"response_format,omitempty"`
-	User           string `json:"user,omitempty"`
-	Background     string `json:"background,omitempty"`
-	OutputFormat   string `json:"output_format,omitempty"`
-	Quality        string `json:"quality,omitempty"`
+	Model          string   `json:"model,omitempty"`
+	Image          string   `json:"image,omitempty"` // single image: base64, URL, or Data URI (backward compat for JSON mode)
+	Images         []string `json:"-"`               // multiple images from multipart uploads (not JSON-serialized)
+	Prompt         string   `json:"prompt"`
+	Mask           string   `json:"mask,omitempty"` // base64 or file content
+	N              *int     `json:"n,omitempty"`
+	Size           string   `json:"size,omitempty"`
+	ResponseFormat string   `json:"response_format,omitempty"`
+	User           string   `json:"user,omitempty"`
+	Background     string   `json:"background,omitempty"`
+	OutputFormat   string   `json:"output_format,omitempty"`
+	Quality        string   `json:"quality,omitempty"`
 }
 
 // ImageVariationRequest represents an OpenAI image variation request
@@ -298,13 +299,13 @@ type ImageVariationRequest struct {
 
 // ImageResponse represents an OpenAI image generation response
 type ImageResponse struct {
-	Created      int64         `json:"created"`
-	Data         []ImageData   `json:"data"`
-	Background   string        `json:"background,omitempty"`
-	OutputFormat string        `json:"output_format,omitempty"`
-	Quality      string        `json:"quality,omitempty"`
-	Size         string        `json:"size,omitempty"`
-	Usage        *ImageUsage   `json:"usage,omitempty"`
+	Created      int64       `json:"created"`
+	Data         []ImageData `json:"data"`
+	Background   string      `json:"background,omitempty"`
+	OutputFormat string      `json:"output_format,omitempty"`
+	Quality      string      `json:"quality,omitempty"`
+	Size         string      `json:"size,omitempty"`
+	Usage        *ImageUsage `json:"usage,omitempty"`
 }
 
 // ImageData represents a single image in the response
@@ -316,11 +317,11 @@ type ImageData struct {
 
 // ImageUsage represents token usage for image generation
 type ImageUsage struct {
-	InputTokens        int                  `json:"input_tokens"`
-	InputTokensDetails *ImageTokenDetails   `json:"input_tokens_details,omitempty"`
-	OutputTokens       int                  `json:"output_tokens"`
-	OutputTokensDetails *ImageTokenDetails  `json:"output_tokens_details,omitempty"`
-	TotalTokens        int                  `json:"total_tokens"`
+	InputTokens         int                `json:"input_tokens"`
+	InputTokensDetails  *ImageTokenDetails `json:"input_tokens_details,omitempty"`
+	OutputTokens        int                `json:"output_tokens"`
+	OutputTokensDetails *ImageTokenDetails `json:"output_tokens_details,omitempty"`
+	TotalTokens         int                `json:"total_tokens"`
 }
 
 // ImageTokenDetails represents token details for image generation
@@ -333,15 +334,15 @@ type ImageTokenDetails struct {
 
 // VideoGenerationRequest represents an OpenAI video generation request
 type VideoGenerationRequest struct {
-	Model       string                 `json:"model"`
-	Input       []VideoInputItem       `json:"input"`
-	Instructions string                `json:"instructions,omitempty"`
-	N           *int                   `json:"n,omitempty"`
-	Size        string                 `json:"size,omitempty"`
-	Duration    string                 `json:"duration,omitempty"`
-	Resolution  string                 `json:"resolution,omitempty"`
-	AspectRatio string                 `json:"aspect_ratio,omitempty"`
-	User        string                 `json:"user,omitempty"`
+	Model        string           `json:"model"`
+	Input        []VideoInputItem `json:"input"`
+	Instructions string           `json:"instructions,omitempty"`
+	N            *int             `json:"n,omitempty"`
+	Size         string           `json:"size,omitempty"`
+	Duration     string           `json:"duration,omitempty"`
+	Resolution   string           `json:"resolution,omitempty"`
+	AspectRatio  string           `json:"aspect_ratio,omitempty"`
+	User         string           `json:"user,omitempty"`
 }
 
 // VideoInputItem represents an input item for video generation
@@ -354,23 +355,23 @@ type VideoInputItem struct {
 
 // VideoResponse represents an OpenAI video generation response
 type VideoResponse struct {
-	ID        string          `json:"id"`
-	Object    string          `json:"object"`
-	CreatedAt int64           `json:"created_at"`
-	Status    string          `json:"status"` // processing, completed, failed
-	Model     string          `json:"model"`
-	Output    []VideoOutput   `json:"output,omitempty"`
-	Error     *VideoError     `json:"error,omitempty"`
-	Usage     *VideoUsage     `json:"usage,omitempty"`
+	ID        string        `json:"id"`
+	Object    string        `json:"object"`
+	CreatedAt int64         `json:"created_at"`
+	Status    string        `json:"status"` // processing, completed, failed
+	Model     string        `json:"model"`
+	Output    []VideoOutput `json:"output,omitempty"`
+	Error     *VideoError   `json:"error,omitempty"`
+	Usage     *VideoUsage   `json:"usage,omitempty"`
 }
 
 // VideoOutput represents video output data
 type VideoOutput struct {
-	Type     string `json:"type"` // url, base64
-	URL      string `json:"url,omitempty"`
-	Content  string `json:"content,omitempty"` // base64 content
+	Type     string  `json:"type"` // url, base64
+	URL      string  `json:"url,omitempty"`
+	Content  string  `json:"content,omitempty"` // base64 content
 	Duration float64 `json:"duration,omitempty"`
-	MimeType string `json:"mime_type,omitempty"`
+	MimeType string  `json:"mime_type,omitempty"`
 }
 
 // VideoError represents a video generation error

@@ -81,8 +81,8 @@ func (p *Provider) ImageEdit(ctx context.Context, req *model.ImageEditRequest) (
 		"size":   convertSizeForAgnes(req.Size),
 	}
 
-	// Normalize the image input
-	images := p.normalizeImageInputs(ctx, req.Image, req.Mask)
+	// Normalize the image input(s) — supports multi-image from multipart
+	images := p.normalizeImageInputs(ctx, req)
 	if len(images) == 0 {
 		return nil, fmt.Errorf("image is required for image edit")
 	}
@@ -100,6 +100,11 @@ func (p *Provider) ImageEdit(ctx context.Context, req *model.ImageEditRequest) (
 
 	if req.N != nil {
 		agnesReq["n"] = *req.N
+	}
+
+	// Pass quality through to Agnes (used by ArcReel SDK)
+	if req.Quality != "" {
+		agnesReq["quality"] = req.Quality
 	}
 
 	p.logger.Info("Agnes image edit (i2i) request",
@@ -125,17 +130,44 @@ func (p *Provider) ImageEdit(ctx context.Context, req *model.ImageEditRequest) (
 	}), nil
 }
 
-// normalizeImageInputs turns the OpenAI-style image/mask strings into a
-// string array suitable for Agnes's "image" parameter. Data URIs are
-// passed through; HTTP(S) URLs are also passed through.
-func (p *Provider) normalizeImageInputs(ctx context.Context, primary string, mask string) []string {
+// normalizeImageInputs turns the OpenAI-style image request into a
+// string array suitable for Agnes's "image" parameter.
+// Supports multi-image uploads (req.Images) from multipart, falling back
+// to single image (req.Image) for JSON-mode backward compatibility.
+// Base64 data URIs are converted to temp URLs when a base64Handler is available.
+func (p *Provider) normalizeImageInputs(ctx context.Context, req *model.ImageEditRequest) []string {
 	out := []string{}
-	if primary != "" {
-		out = append(out, normalizeOneImage(primary))
+
+	// Collect source images: multi-image takes priority, fall back to single
+	imageSources := req.Images
+	if len(imageSources) == 0 && req.Image != "" {
+		imageSources = []string{req.Image}
 	}
-	if mask != "" {
-		out = append(out, normalizeOneImage(mask))
+
+	reqCtx := utils.RequestContextFromCtx(ctx)
+
+	for _, img := range imageSources {
+		normalized := normalizeOneImage(img)
+		// Convert data URIs to temp URLs so Agnes can fetch them
+		if utils.IsDataURL(normalized) && p.base64Handler != nil {
+			if tmpURL, ok, err := p.base64Handler.ConvertDataURL(normalized, reqCtx); err == nil && ok {
+				normalized = tmpURL
+			}
+		}
+		out = append(out, normalized)
 	}
+
+	// Mask is appended separately (Agnes treats it as an additional input image)
+	if req.Mask != "" {
+		maskNorm := normalizeOneImage(req.Mask)
+		if utils.IsDataURL(maskNorm) && p.base64Handler != nil {
+			if tmpURL, ok, err := p.base64Handler.ConvertDataURL(maskNorm, reqCtx); err == nil && ok {
+				maskNorm = tmpURL
+			}
+		}
+		out = append(out, maskNorm)
+	}
+
 	return out
 }
 

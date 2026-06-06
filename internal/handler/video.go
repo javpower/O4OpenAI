@@ -3,7 +3,9 @@ package handler
 import (
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/o4openai/internal/model"
@@ -32,8 +34,18 @@ func NewVideoHandler(registry *provider.Registry, base64Handler *utils.Base64Han
 
 // HandleGenerate handles POST /v1/videos/generations
 func (h *VideoHandler) HandleGenerate(c *gin.Context) {
+	contentType := c.GetHeader("Content-Type")
+
 	var req model.VideoGenerationRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	var err error
+
+	if strings.HasPrefix(contentType, "multipart/form-data") {
+		err = h.parseMultipartVideoGenerate(c, &req)
+	} else {
+		err = c.ShouldBindJSON(&req)
+	}
+
+	if err != nil {
 		c.JSON(http.StatusBadRequest, model.ErrorResponse{
 			Error: model.ErrorDetail{
 				Message: fmt.Sprintf("Invalid request: %v", err),
@@ -59,7 +71,6 @@ func (h *VideoHandler) HandleGenerate(c *gin.Context) {
 	}
 
 	var p model.Provider
-	var err error
 	if h.forcedProvider != "" {
 		p, err = h.registry.GetProvider(h.forcedProvider)
 	} else {
@@ -94,7 +105,7 @@ func (h *VideoHandler) HandleGenerate(c *gin.Context) {
 		return
 	}
 
-	if resp.Status == "processing" {
+	if resp.Status == "in_progress" || resp.Status == "queued" {
 		c.JSON(http.StatusAccepted, resp)
 		return
 	}
@@ -159,6 +170,108 @@ func (h *VideoHandler) HandleRetrieve(c *gin.Context) {
 			Code:    "video_not_found",
 		},
 	})
+}
+
+// HandleDownloadContent handles GET /v1/videos/:id/content
+// Downloads video content by retrieving the video URL and redirecting.
+// This is compatible with the OpenAI SDK's client.videos.download_content() method.
+func (h *VideoHandler) HandleDownloadContent(c *gin.Context) {
+	videoID := c.Param("id")
+	if videoID == "" {
+		c.JSON(http.StatusBadRequest, model.ErrorResponse{
+			Error: model.ErrorDetail{
+				Message: "Video ID is required",
+				Type:    "invalid_request_error",
+				Code:    "missing_video_id",
+			},
+		})
+		return
+	}
+
+	ctx := ctxWithKey(c)
+	providers := h.providersToTry()
+
+	for _, p := range providers {
+		if !p.SupportsVideoGeneration() {
+			continue
+		}
+		resp, err := p.VideoRetrieve(ctx, videoID)
+		if err != nil {
+			if isUpstreamNotFound(err) {
+				continue
+			}
+			respondProviderError(c, "Video download", err)
+			return
+		}
+		if resp.Status != "completed" || len(resp.Output) == 0 || resp.Output[0].URL == "" {
+			c.JSON(http.StatusBadRequest, model.ErrorResponse{
+				Error: model.ErrorDetail{
+					Message: fmt.Sprintf("Video %q is not ready for download (status: %s)", videoID, resp.Status),
+					Type:    "invalid_request_error",
+					Code:    "video_not_ready",
+				},
+			})
+			return
+		}
+		// Redirect to the video URL — avoids proxying large files through the gateway
+		videoURL := resp.Output[0].URL
+		h.logger.Info("Video download redirect", zap.String("video_id", videoID), zap.String("url", videoURL))
+		c.Redirect(http.StatusFound, videoURL)
+		return
+	}
+
+	c.JSON(http.StatusNotFound, model.ErrorResponse{
+		Error: model.ErrorDetail{
+			Message: fmt.Sprintf("Video %q not found", videoID),
+			Type:    "invalid_request_error",
+			Code:    "video_not_found",
+		},
+	})
+}
+
+// parseMultipartVideoGenerate parses multipart/form-data for video generation.
+// This is needed for compatibility with the OpenAI Python SDK's videos.create() method,
+// which sends multipart requests with fields: model, prompt, seconds, size, input_reference.
+func (h *VideoHandler) parseMultipartVideoGenerate(c *gin.Context, req *model.VideoGenerationRequest) error {
+	form, err := c.MultipartForm()
+	if err != nil {
+		return err
+	}
+
+	if values := form.Value["model"]; len(values) > 0 {
+		req.Model = values[0]
+	}
+	// OpenAI Videos API uses "prompt" as the top-level text instruction
+	if values := form.Value["prompt"]; len(values) > 0 {
+		req.Instructions = values[0]
+	}
+	if values := form.Value["seconds"]; len(values) > 0 {
+		req.Duration = values[0]
+	}
+	if values := form.Value["size"]; len(values) > 0 {
+		req.Size = values[0]
+	}
+
+	// Parse input_reference file uploads (image references for image-to-video)
+	if files := form.File["input_reference"]; len(files) > 0 {
+		for _, fh := range files {
+			file, err := fh.Open()
+			if err != nil {
+				return fmt.Errorf("failed to open input_reference file %s: %w", fh.Filename, err)
+			}
+			data, err := io.ReadAll(file)
+			file.Close()
+			if err != nil {
+				return fmt.Errorf("failed to read input_reference file %s: %w", fh.Filename, err)
+			}
+			req.Input = append(req.Input, model.VideoInputItem{
+				Type:  "image",
+				Image: encodeToBase64String(data),
+			})
+		}
+	}
+
+	return nil
 }
 
 // providersToTry returns the provider list to attempt, starting with
