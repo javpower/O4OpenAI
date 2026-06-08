@@ -678,6 +678,16 @@
       <span class="path">/messages/stream</span>
     </div>
 
+    <div class="group-title">Responses API</div>
+    <div class="item" onclick="switchPanel('responses', this)">
+      <span class="method method-post">POST</span>
+      <span class="path">/responses</span>
+    </div>
+    <div class="item" onclick="switchPanel('responses-stream', this)">
+      <span class="method method-post">POST</span>
+      <span class="path">/responses/stream</span>
+    </div>
+
     <div class="group-title">Images 图片</div>
     <div class="item" onclick="switchPanel('image-gen', this)">
       <span class="method method-post">POST</span>
@@ -871,6 +881,55 @@
         <button class="btn btn-secondary" onclick="stopAnthropicStream()" style="display:none" id="stopAnthropicStreamBtn">停止</button>
         <div class="stream-text" id="anthropic-stream-output" style="display:none"></div>
         <div id="anthropic-stream-response"></div>
+      </div>
+      <!-- ==================== Responses API ==================== -->
+      <div class="panel-section" id="panel-responses">
+        <div class="api-desc">
+          <strong>POST /v1/responses</strong> — OpenAI Responses API 兼容接口。输入为 string 或 input items 数组，返回 Responses 格式的 output 对象。
+        </div>
+        <div class="form-group">
+          <label>Model</label>
+          <select id="responses-model">
+            <option value="agnes-2.0-flash">agnes-2.0-flash</option>
+            <option value="agnes-1.5-flash">agnes-1.5-flash</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Instructions (可选)</label>
+          <input type="text" id="responses-instructions" placeholder="You are a helpful assistant.">
+        </div>
+        <div class="form-group">
+          <label>Input</label>
+          <textarea id="responses-input" rows="3">Hello, what can you do?</textarea>
+        </div>
+        <button class="btn btn-primary" onclick="sendResponses()">发送请求</button>
+        <div id="responses-response"></div>
+      </div>
+
+      <!-- ==================== Responses API Stream ==================== -->
+      <div class="panel-section" id="panel-responses-stream">
+        <div class="api-desc">
+          <strong>POST /v1/responses (stream: true)</strong> — Responses API 流式。返回 SSE 事件（response.created, response.output_text.delta, response.completed 等）。
+        </div>
+        <div class="form-group">
+          <label>Model</label>
+          <select id="responses-stream-model">
+            <option value="agnes-2.0-flash">agnes-2.0-flash</option>
+            <option value="agnes-1.5-flash">agnes-1.5-flash</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Instructions (可选)</label>
+          <input type="text" id="responses-stream-instructions" placeholder="You are a helpful assistant.">
+        </div>
+        <div class="form-group">
+          <label>Input</label>
+          <textarea id="responses-stream-input" rows="3">请用中文写一首关于编程的短诗。</textarea>
+        </div>
+        <button class="btn btn-primary" id="responsesStreamBtn" onclick="sendResponsesStream()">开始流式输出</button>
+        <button class="btn btn-secondary" onclick="stopResponsesStream()" style="display:none" id="stopResponsesStreamBtn">停止</button>
+        <div class="stream-text" id="responses-stream-output" style="display:none"></div>
+        <div id="responses-stream-response"></div>
       </div>
 
       <!-- ==================== Image Generation ==================== -->
@@ -2472,6 +2531,102 @@ window.addEventListener('DOMContentLoaded', function() {
   // Health check
   checkHealth();
 });
+
+// ==================== Responses API (non-stream) ====================
+async function sendResponses() {
+  const model = document.getElementById('responses-model').value;
+  const instructions = document.getElementById('responses-instructions').value.trim();
+  const input = document.getElementById('responses-input').value.trim();
+
+  const body = { model, input, stream: false };
+  if (instructions) body.instructions = instructions;
+
+  const t0 = performance.now();
+  try {
+    const res = await fetch(url('/v1/responses'), {
+      method: 'POST', headers: headers(), body: JSON.stringify(body)
+    });
+    const elapsed = Math.round(performance.now() - t0);
+    const data = await res.json();
+    renderResponse('responses-response', res.status, data, elapsed);
+  } catch (e) {
+    const elapsed = Math.round(performance.now() - t0);
+    renderResponse('responses-response', 0, { error: e.message }, elapsed);
+  }
+}
+
+// ==================== Responses API (stream) ====================
+let responsesStreamController = null;
+async function sendResponsesStream() {
+  const model = document.getElementById('responses-stream-model').value;
+  const instructions = document.getElementById('responses-stream-instructions').value.trim();
+  const input = document.getElementById('responses-stream-input').value.trim();
+
+  const body = { model, input, stream: true };
+  if (instructions) body.instructions = instructions;
+
+  responsesStreamController = new AbortController();
+  document.getElementById('responsesStreamBtn').disabled = true;
+  document.getElementById('stopResponsesStreamBtn').style.display = 'inline-flex';
+  const outputEl = document.getElementById('responses-stream-output');
+  outputEl.style.display = 'block';
+  outputEl.textContent = '';
+  const respEl = document.getElementById('responses-stream-response');
+  respEl.innerHTML = '';
+  const t0 = performance.now();
+  let fullText = '';
+
+  try {
+    const res = await fetch(url('/v1/responses'), {
+      method: 'POST', headers: headers(), body: JSON.stringify(body),
+      signal: responsesStreamController.signal
+    });
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const payload = line.slice(6).trim();
+          try {
+            const evt = JSON.parse(payload);
+            if (evt.type === 'response.output_text.delta' && evt.delta) {
+              fullText += evt.delta;
+              outputEl.textContent = fullText;
+              outputEl.scrollTop = outputEl.scrollHeight;
+            }
+          } catch {}
+        }
+      }
+    }
+    const elapsed = Math.round(performance.now() - t0);
+    respEl.innerHTML = `
+      <div class="response-section">
+        <div class="response-header">
+          <span class="status-badge status-2xx">Stream Done</span>
+          <span class="time-badge">${elapsed}ms | ${(fullText.length / (elapsed / 1000)).toFixed(0)} chars/s</span>
+        </div>
+      </div>
+    `;
+  } catch (e) {
+    if (e.name !== 'AbortError') {
+      const elapsed = Math.round(performance.now() - t0);
+      renderResponse('responses-stream-response', 0, { error: e.message }, elapsed);
+    }
+  } finally {
+    document.getElementById('responsesStreamBtn').disabled = false;
+    document.getElementById('stopResponsesStreamBtn').style.display = 'none';
+    responsesStreamController = null;
+  }
+}
+function stopResponsesStream() {
+  if (responsesStreamController) responsesStreamController.abort();
+}
 </script>
 
 </body>

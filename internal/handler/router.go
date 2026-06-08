@@ -75,6 +75,10 @@ func registerAPIRoutes(rg *gin.RouterGroup, registry *provider.Registry, base64H
 	rg.GET("/models", modelsHandler.HandleList)
 	rg.GET("/models/:model", modelsHandler.HandleRetrieve)
 
+	// OpenAI Responses API compatibility
+	responsesHandler := NewResponsesHandler(registry, base64Handler, logger, forcedProvider)
+	rg.POST("/responses", responsesHandler.HandleCreate)
+
 	// Anthropic Messages API compatibility
 	anthropicHandler := NewAnthropicHandler(registry, base64Handler, logger, forcedProvider)
 	rg.POST("/messages", anthropicHandler.HandleMessages)

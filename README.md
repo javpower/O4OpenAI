@@ -4,6 +4,7 @@
 
 ## 特性
 
+-  **OpenAI Responses API 兼容** — `POST /v1/responses`，支持流式和非流式
 -  **OpenAI API 兼容** — Chat Completions、Images、Videos、Models 接口
 -  **Anthropic Messages API 兼容** — 支持 `POST /v1/messages`，兼容 Anthropic SDK
 -  **插件化 Provider 架构** — 轻松添加新的第三方平台适配器
@@ -21,6 +22,7 @@
 
 | 接口 | 方法 | 路径 | 说明 |
 |------|------|------|------|
+| Responses | POST | `/v1/responses` | OpenAI Responses API，支持流式和非流式 |
 | Chat Completions | POST | `/v1/chat/completions` | 支持流式和非流式 |
 | Image Generation | POST | `/v1/images/generations` | 文生图 |
 | Image Edit | POST | `/v1/images/edits` | 图生图（image + prompt） |
@@ -372,6 +374,32 @@ with client.messages.stream(
 ) as stream:
     for text in stream.text_stream:
         print(text, end="", flush=True)
+```
+
+### 8. Responses API（非流式）
+
+```bash
+curl http://localhost:1241/v1/responses \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_AGNES_API_KEY" \
+  -d '{
+    "model": "agnes-1.5-flash",
+    "input": "Hello!",
+    "stream": false
+  }'
+```
+
+### 9. Responses API（流式 SSE）
+
+```bash
+curl -N http://localhost:1241/v1/responses \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_AGNES_API_KEY" \
+  -d '{
+    "model": "agnes-1.5-flash",
+    "input": "Count to 3",
+    "stream": true
+  }'
 ```
 
 ## 错误响应
